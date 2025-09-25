@@ -9,11 +9,7 @@ Key Design Decisions:
 1. Touch Management: Manager grabs all touches and controls routing
 2. State Tracking: Uses touch.ud keys to track nested scroll state
 3. Touch Router Pattern: Centralizes all touch handling logic
-4. Incremental Development: Built step-by-step with testing at each stage
 
-State Transitions:
-pending → inner | outer → replayed
-inner → inner-rejected → outer (for scroll limit handling)
 """
 
 from kivy.uix.relativelayout import RelativeLayout
@@ -98,16 +94,16 @@ class NestedScrollViewManager(RelativeLayout):
             if outer_scrollview.dispatch('on_scroll_start', touch):
                 touch.pop()
                 touch.grab(self)
-                # outer_scrollview._touch = touch
                 touch.ud['nsvm']['mode'] = 'outer'
                 print(f"Outer ScrollView accepted touch, mode set to 'outer'")
                 return True
         if inner_scrollview:
+            touch.pop()
+            touch.push()
             touch.apply_transform_2d(inner_scrollview.parent.to_widget)
             if inner_scrollview.dispatch('on_scroll_start', touch):   
                 touch.pop()
                 touch.grab(self)
-                # inner_scrollview._touch = touch
                 print(f"Inner ScrollView accepted touch, mode set to 'inner'")
                 touch.ud['nsvm']['mode'] = 'inner'
                 return True
@@ -156,6 +152,8 @@ class NestedScrollViewManager(RelativeLayout):
         
         # Initialize scroll handling state
         touch.ud['sv.handled'] = {'x': False, 'y': False}
+        # Track which axes have been handled by ScrollView to prevent
+        # double-processing and coordinate multi-axis scrolling
             
         if mode == 'inner':
             print(f"Moving inner ScrollView")
@@ -164,26 +162,35 @@ class NestedScrollViewManager(RelativeLayout):
             touch.apply_transform_2d(self.inner_scrollview.parent.to_widget)
             result = self.inner_scrollview.dispatch('on_scroll_move', touch)
             touch.pop()
+            if not result and touch.ud['nsvm']['mode'] == 'inner-pushing-outer':
+                touch.ud['nsvm']['mode'] = 'inner'
+                print(f"   Inner pushing outer ScrollView")
+                # Transform touch to outer ScrollView's parent's coordinate space
+                touch.push()
+                touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
+                result = self.outer_scrollview.dispatch('on_scroll_move', touch)
+                touch.pop()
+                return result 
             return result
             
         elif mode == 'outer':
-            print(f"   Moving outer ScrollView")
+            print(f"Moving outer ScrollView")
             # Transform touch to outer ScrollView's parent's coordinate space
             touch.push()
             touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
             result = self.outer_scrollview.dispatch('on_scroll_move', touch)
             touch.pop()
             return result
-            
-        elif mode == 'inner-pushing-outer':
-            touch.ud['nsvm']['mode'] = 'inner'
-            print(f"   Inner pushing outer ScrollView")
-            # Transform touch to outer ScrollView's parent's coordinate space
-            touch.push()
-            touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
-            result = self.outer_scrollview.dispatch('on_scroll_move', touch)
-            touch.pop()
-            return result 
+        
+        # if mode == 'inner-pushing-outer':
+        #     touch.ud['nsvm']['mode'] = 'inner'
+        #     print(f"   Inner pushing outer ScrollView")
+        #     # Transform touch to outer ScrollView's parent's coordinate space
+        #     touch.push()
+        #     touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
+        #     result = self.outer_scrollview.dispatch('on_scroll_move', touch)
+        #     touch.pop()
+        #     return result 
             
         return False
         
@@ -235,7 +242,7 @@ class NestedScrollViewManager(RelativeLayout):
             
             uid = self.outer_scrollview._get_uid()
             self.outer_scrollview.dispatch('on_scroll_stop', touch)
-            if not touch.ud[uid].get('can_defocus', True):
+            if uid in touch.ud and not touch.ud[uid].get('can_defocus', True):
                 FocusBehavior.ignored_touch.append(touch)
             touch.pop()
         else:
