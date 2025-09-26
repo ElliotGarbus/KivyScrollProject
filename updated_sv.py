@@ -1102,17 +1102,38 @@ class ScrollView(StencilView):
             print(f"on_scroll_move: ud['dy'] += abs(touch.dy): {ud['dy']}")
             
 
-            if ((ud['dx'] > self.scroll_distance and self.do_scroll_x) or
-                    (ud['dy'] > self.scroll_distance and self.do_scroll_y)):
+            # Transition to scroll mode if movement exceeds threshold on any axis
+            # This allows orthogonal delegation to work properly
+            if (ud['dx'] > self.scroll_distance or ud['dy'] > self.scroll_distance):
                 ud['mode'] = 'scroll'
 
         if ud['mode'] == 'scroll':
+            print(f"SCROLL MODE ACTIVE: ScrollView {self} processing touch in scroll mode")
+            # ORTHOGONAL DELEGATION CHECK:
+            # Only inner ScrollViews should delegate orthogonal movement to outer ScrollViews
+            # Outer ScrollViews (mode='outer') should not delegate further
+            if 'nsvm' in touch.ud and touch.ud['nsvm'].get('mode') == 'inner':
+                # Only delegate if movement is primarily in a direction we can't handle
+                abs_dx = abs(touch.dx)
+                abs_dy = abs(touch.dy)
+                
+                # Check if movement is primarily horizontal but we can't scroll horizontally
+                primarily_horizontal = abs_dx > abs_dy and not self.do_scroll_x
+                # Check if movement is primarily vertical but we can't scroll vertically  
+                primarily_vertical = abs_dy > abs_dx and not self.do_scroll_y
+                
+                if primarily_horizontal or primarily_vertical:
+                    print(f"Inner ScrollView: Orthogonal movement detected - delegating (dx:{touch.dx:.1f}, dy:{touch.dy:.1f})")
+                    print(f"ScrollView capabilities: do_scroll_x={self.do_scroll_x}, do_scroll_y={self.do_scroll_y}")
+                    print(f"Movement analysis: primarily_horizontal={primarily_horizontal}, primarily_vertical={primarily_vertical}")
+                    return False  # Let manager handle delegation
+            
             not_in_bar = not touch.ud.get('in_bar_x', False) and \
                 not touch.ud.get('in_bar_y', False)
 
             if not touch.ud['sv.handled']['x'] and self.do_scroll_x \
                     and self.effect_x:
-                print(f"on_scroll_move: not touch.ud['sv.handled']['x'] and self.do_scroll_x and self.effect_x")
+                print(f"PROCESSING X-AXIS: do_scroll_x={self.do_scroll_x}, effect_x={self.effect_x}, handled={touch.ud['sv.handled']['x']}")
                 width = self.width
                 if touch.ud.get('in_bar_x', False):
                     if self.hbar[1] != 1:
@@ -1120,32 +1141,40 @@ class ScrollView(StencilView):
                         self.scroll_x = min(max(self.scroll_x + dx, 0.), 1.)
                         self._trigger_update_from_scroll()
                 elif not_in_bar:
+                    print(f"EFFECT UPDATE X: touch.x={touch.x}, self.effect_x={self.effect_x}")
                     self.effect_x.update(touch.x)
 
-                if self.scroll_x < 0 or self.scroll_x > 1: # TODO: change state for manager
-                    rv = False
-                    print(f"on_scroll_move: rv = False, line 1136")
-                else:
-                    touch.ud['sv.handled']['x'] = True
+                # Always mark as handled for effects to work, even at boundaries
+                touch.ud['sv.handled']['x'] = True
+                
+                # Let effects handle boundary behavior (bouncing, overscroll)
+                if self.scroll_x < 0 or self.scroll_x > 1:
+                    print(f"SCROLL BOUNDARY: scroll_x={self.scroll_x}, letting effects handle boundary behavior")
                 # Touch resulted in scroll should not defocus focused widget
                 touch.ud['sv.can_defocus'] = False
             if not touch.ud['sv.handled']['y'] and self.do_scroll_y \
                     and self.effect_y:
-                print(f"on_scroll_move: not touch.ud['sv.handled']['y'] and self.do_scroll_y and self.effect_y")
+                print(f"PROCESSING Y-AXIS: do_scroll_y={self.do_scroll_y}, effect_y={self.effect_y}, handled={touch.ud['sv.handled']['y']}")
                 height = self.height
                 if touch.ud.get('in_bar_y', False) and self.vbar[1] != 1.0:
                     dy = touch.dy / float(height - height * self.vbar[1])
                     self.scroll_y = min(max(self.scroll_y + dy, 0.), 1.)
                     self._trigger_update_from_scroll()
                 elif not_in_bar:
-                    print(f"on_scroll_move: not_in_bar")
+                    print(f"EFFECT UPDATE Y: touch.y={touch.y}, effect_value_before={self.effect_y.value}")
                     self.effect_y.update(touch.y)
+                    print(f"EFFECT UPDATE Y: effect_value_after={self.effect_y.value}, scroll_y={self.scroll_y}")
+                    # Force update from effect to scroll position
+                    self._trigger_update_from_scroll()
 
-                if self.scroll_y < 0 or self.scroll_y > 1: # TODO: change state for manager
-                    rv = False
-                    print(f"on_scroll_move: rv = False, line 1155")
-                else:
-                    touch.ud['sv.handled']['y'] = True
+                # Always mark as handled for effects to work, even at boundaries
+                touch.ud['sv.handled']['y'] = True
+                
+                # Let effects handle boundary behavior (bouncing, overscroll)
+                # Don't return False immediately - effects need to process boundaries
+                if self.scroll_y < 0 or self.scroll_y > 1:
+                    print(f"SCROLL BOUNDARY: scroll_y={self.scroll_y}, letting effects handle boundary behavior")
+                    # rv remains True to let effects handle the boundary
                 # Touch resulted in scroll should not defocus focused widget
                 touch.ud['sv.can_defocus'] = False
             ud['dt'] = touch.time_update - ud['time']
