@@ -183,16 +183,14 @@ class NestedScrollViewManager(RelativeLayout):
                     
                     # Create a synthetic "start" position by calculating where the gesture began
                     # based on current position and accumulated movement
+                    #todo: remove test, unindent.  Using _touch to get original pos
                     inner_uid = self.inner_scrollview._get_uid()
                     if inner_uid in touch.ud:
                         inner_ud = touch.ud[inner_uid]
-                        # Calculate approximate start position
-                        start_x = touch.x + inner_ud.get('dx', 0) * (touch.dx / abs(touch.dx) if touch.dx != 0 else 1)
-                        start_y = touch.y + inner_ud.get('dy', 0) * (touch.dy / abs(touch.dy) if touch.dy != 0 else 1)
-                        
+                        print(f'{inner_scrollview._touch.pos=} ')
                         # Temporarily modify touch position for effect start
                         original_x, original_y = touch.x, touch.y
-                        touch.x, touch.y = start_x, start_y
+                        touch.x, touch.y = inner_scrollview._touch.pos
                         
                         # Initialize outer ScrollView without calling on_touch_down to avoid button presses
                         # We need to set up the essential state that on_touch_down would normally do
@@ -209,7 +207,7 @@ class NestedScrollViewManager(RelativeLayout):
                         # Restore original position
                         touch.x, touch.y = original_x, original_y
                         
-                        print(f"   Started outer ScrollView effects from calculated start position: ({start_x}, {start_y})")
+                        # print(f"   Started outer ScrollView effects from calculated start position: ({start_x}, {start_y})")
                     else:
                         # Fallback to normal initialization
                         self.outer_scrollview.dispatch('on_scroll_start', touch)
