@@ -1127,6 +1127,8 @@ class ScrollView(StencilView):
                     print(f"ScrollView capabilities: do_scroll_x={self.do_scroll_x}, do_scroll_y={self.do_scroll_y}")
                     print(f"Movement analysis: primarily_horizontal={primarily_horizontal}, primarily_vertical={primarily_vertical}")
                     return False  # Let manager handle delegation
+                
+                #  
             
             not_in_bar = not touch.ud.get('in_bar_x', False) and \
                 not touch.ud.get('in_bar_y', False)

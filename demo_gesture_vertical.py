@@ -17,9 +17,6 @@ class VerticalDemo(App):
         root.add_widget(content)
 
         # Simple debug prints
-        root.bind(on_scroll_start=lambda *_: print('[vertical] start'))
-        root.bind(on_scroll_move=lambda *_: print('[vertical] move'))
-        root.bind(on_scroll_stop=lambda *_: print('[vertical] stop'))
         return root
 
 

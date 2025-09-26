@@ -107,7 +107,7 @@ class NestedScrollViewManager(RelativeLayout):
             touch.apply_transform_2d(inner_scrollview.parent.to_widget)
             if inner_scrollview.dispatch('on_scroll_start', touch):   
                 touch.pop()
-                touch.grab(self)
+                touch.grab(self)  # Manager maintains grab ownership
                 print(f"Inner ScrollView accepted touch, mode set to 'inner'")
                 touch.ud['nsvm']['mode'] = 'inner'
                 return True
@@ -178,23 +178,15 @@ class NestedScrollViewManager(RelativeLayout):
                 outer_uid = self.outer_scrollview._get_uid()
                 if outer_uid not in touch.ud:
                     print(f"   Initializing outer ScrollView for delegation")
-                    # Initialize outer ScrollView with scroll start - but we need to do this properly
-                    # The key insight: we need to make the outer ScrollView think it received the touch from the beginning
                     
-                    # Create a synthetic "start" position by calculating where the gesture began
-                    # based on current position and accumulated movement
-                    #todo: remove test, unindent.  Using _touch to get original pos
-                    inner_uid = self.inner_scrollview._get_uid()
-                    if inner_uid in touch.ud:
-                        inner_ud = touch.ud[inner_uid]
-                        print(f'{inner_scrollview._touch.pos=} ')
-                        # Temporarily modify touch position for effect start
+                    # Use the original touch start position from inner ScrollView
+                    if self.inner_scrollview._touch:
+                        print(f"   Using inner ScrollView start position: {self.inner_scrollview._touch.pos}")
+                        # Temporarily modify touch position to the original start position
                         original_x, original_y = touch.x, touch.y
-                        touch.x, touch.y = inner_scrollview._touch.pos
+                        touch.x, touch.y = self.inner_scrollview._touch.pos
                         
-                        # Initialize outer ScrollView without calling on_touch_down to avoid button presses
-                        # We need to set up the essential state that on_touch_down would normally do
-                        print(f"   Initializing outer ScrollView state for delegation (avoiding on_touch_down)")
+                        print(f"   Initializing outer ScrollView state for delegation")
                         
                         # CRITICAL: Initialize effects BEFORE setting _touch to avoid simulate_touch_down
                         # on_scroll_start checks if self._touch is set and calls simulate_touch_down if it is
@@ -204,12 +196,12 @@ class NestedScrollViewManager(RelativeLayout):
                         # Set _touch AFTER on_scroll_start to avoid triggering simulate_touch_down
                         self.outer_scrollview._touch = touch
                         
-                        # Restore original position
+                        # Restore current position
                         touch.x, touch.y = original_x, original_y
-                        
-                        # print(f"   Started outer ScrollView effects from calculated start position: ({start_x}, {start_y})")
                     else:
-                        # Fallback to normal initialization
+                        # Fallback if inner ScrollView doesn't have _touch set
+                        print(f"   No inner ScrollView _touch available, using current position")
+                        touch.grab(self.outer_scrollview)
                         self.outer_scrollview.dispatch('on_scroll_start', touch)
                         self.outer_scrollview._touch = touch
                 
@@ -217,9 +209,15 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.ud['sv.handled'] = {'x': False, 'y': False}
                 print(f"   Reset sv.handled flags for outer ScrollView delegation")
                 
-                # Delegate to outer ScrollView (no grab transfer needed)
-                # We call dispatch('on_scroll_move') directly, bypassing on_touch_move's grab check
+                # Temporarily transfer grab ownership for outer ScrollView delegation
+                touch.ungrab(self)
+                touch.grab(self.outer_scrollview)
+                
                 outer_result = self.outer_scrollview.dispatch('on_scroll_move', touch)
+                
+                # Restore grab ownership to manager
+                touch.ungrab(self.outer_scrollview) 
+                touch.grab(self)
                 touch.pop()
                 
                 # CRITICAL: Always return True for delegated touches to prevent button presses
