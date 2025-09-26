@@ -18,7 +18,6 @@ Features:
 """
 
 from kivy.uix.relativelayout import RelativeLayout
-from kivy.properties import ObjectProperty, ListProperty
 from kivy.uix.behaviors import FocusBehavior
 from kivy.clock import Clock
 from updated_sv import ScrollView
@@ -179,31 +178,11 @@ class NestedScrollViewManager(RelativeLayout):
                 if outer_uid not in touch.ud:
                     print(f"   Initializing outer ScrollView for delegation")
                     
-                    # Use the original touch start position from inner ScrollView
-                    if self.inner_scrollview._touch:
-                        print(f"   Using inner ScrollView start position: {self.inner_scrollview._touch.pos}")
-                        # Temporarily modify touch position to the original start position
-                        original_x, original_y = touch.x, touch.y
-                        touch.x, touch.y = self.inner_scrollview._touch.pos
-                        
-                        print(f"   Initializing outer ScrollView state for delegation")
-                        
-                        # CRITICAL: Initialize effects BEFORE setting _touch to avoid simulate_touch_down
-                        # on_scroll_start checks if self._touch is set and calls simulate_touch_down if it is
-                        touch.grab(self.outer_scrollview)
-                        self.outer_scrollview.dispatch('on_scroll_start', touch)
-                        
-                        # Set _touch AFTER on_scroll_start to avoid triggering simulate_touch_down
-                        self.outer_scrollview._touch = touch
-                        
-                        # Restore current position
-                        touch.x, touch.y = original_x, original_y
-                    else:
-                        # Fallback if inner ScrollView doesn't have _touch set
-                        print(f"   No inner ScrollView _touch available, using current position")
-                        touch.grab(self.outer_scrollview)
-                        self.outer_scrollview.dispatch('on_scroll_start', touch)
-                        self.outer_scrollview._touch = touch
+                    # Initialize outer ScrollView normally with current touch position
+                    # This ensures effects get proper history initialization
+                    touch.grab(self.outer_scrollview)
+                    self.outer_scrollview.dispatch('on_scroll_start', touch)
+                    self.outer_scrollview._touch = touch
                 
                 # Reset sv.handled flags for delegation
                 touch.ud['sv.handled'] = {'x': False, 'y': False}
