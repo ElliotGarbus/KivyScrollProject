@@ -25,16 +25,17 @@ Touch scrolling behavior:
   hits its boundary the scroll is propagated to the outer scrollview.
 """
 
-
+#TODO: create nested xy tests
 #TODO: update scroll_events so they work as expected.
-#TODO: Evaluate integration of the Mnaager in the ScrollView.
+#TODO: Evaluate integration of the Manager in the ScrollView.
 #TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
-#TODO: create a test suite for the updated ScrollView & NSVMfor the kivy test suite.
+#TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
 #TODO: test interation with draggable widgets. 
-#TODO: Update documention that describes the expected behavior of nested scrollviews.
+#TODO: Update documentation that describes the expected behavior of nested scrollviews.
 #TODO: remove debug print statements.
-#TODO: clean up code/implementaion comments.
+#TODO: clean up code/implementation comments.
 #TODO: Register the NestedScrollViewManager with kv.
+#TODO: formatting prior to PR
 
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior
