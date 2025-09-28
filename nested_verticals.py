@@ -14,20 +14,28 @@ class InnerScrollView(ScrollView):
         self.scroll_type = ['bars', 'content']
         self.size_hint_y = None
         self.height = dp(200)  # fixed viewport height for the inner scroll
+        self.size_hint_x = None  # Don't use size hint for width
 
         # Layout inside the inner scroll
-        content = GridLayout(cols=1, size_hint_y=None, padding=dp(8), spacing=dp(6))
+        content = GridLayout(cols=1, size_hint_y=None, size_hint_x=None, padding=dp(8), spacing=dp(6))
         content.bind(minimum_height=content.setter('height'))
+        content.bind(minimum_width=content.setter('width'))
 
         # Add demo labels
         for j in range(1, 25):
-            content.add_widget(Label(
+            label = Label(
                 text=f"Item {j} in Panel {panel_index + 1}",
                 size_hint_y=None,
+                size_hint_x=None,  # Don't use size hint for width
                 height=dp(32),
-            ))
+            )
+            label.bind(texture_size=label.setter('size'))  # Size to fit text
+            content.add_widget(label)
 
         self.add_widget(content)
+        
+        # Bind scrollview width to content width
+        content.bind(width=self.setter('width'))
 
 
 class InnerPanel(BoxLayout):
@@ -48,8 +56,12 @@ class InnerPanel(BoxLayout):
         ))
         self.add_widget(header)
 
-        # Inner vertical scroll
-        self.add_widget(InnerScrollView(panel_index))
+        # Inner vertical scroll - centered
+        scroll_container = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(200))
+        scroll_container.add_widget(Label())  # Left spacer
+        scroll_container.add_widget(InnerScrollView(panel_index))
+        scroll_container.add_widget(Label())  # Right spacer
+        self.add_widget(scroll_container)
 
 
 class NestedScrollsApp(App):
