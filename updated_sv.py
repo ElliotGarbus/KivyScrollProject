@@ -1125,17 +1125,15 @@ class ScrollView(StencilView):
 
         if ud['mode'] == 'scroll':
             print(f"SCROLL MODE ACTIVE: ScrollView {self} processing touch in scroll mode")
-            # ORTHOGONAL DELEGATION CHECK:
-            # Only inner ScrollViews should delegate orthogonal movement to outer ScrollViews
+            # NESTED SCROLLVIEW DELEGATION CHECK:
+            # Only inner ScrollViews should delegate to outer ScrollViews
             # Outer ScrollViews (mode='outer') should not delegate further
             if 'nsvm' in touch.ud and touch.ud['nsvm'].get('mode') == 'inner':
-                # Only delegate if movement is primarily in a direction we can't handle
                 abs_dx = abs(touch.dx)
                 abs_dy = abs(touch.dy)
                 
-                # Check if movement is primarily horizontal but we can't scroll horizontally
+                # ORTHOGONAL DELEGATION: delegate if movement is in unsupported direction
                 primarily_horizontal = abs_dx > abs_dy and not self.do_scroll_x
-                # Check if movement is primarily vertical but we can't scroll vertically  
                 primarily_vertical = abs_dy > abs_dx and not self.do_scroll_y
                 
                 if primarily_horizontal or primarily_vertical:
@@ -1144,7 +1142,23 @@ class ScrollView(StencilView):
                     print(f"Movement analysis: primarily_horizontal={primarily_horizontal}, primarily_vertical={primarily_vertical}")
                     return False  # Let manager handle delegation
                 
-                #  
+                # PARALLEL BOUNDARY DELEGATION: delegate if at scroll boundary in parallel setup
+                # Only delegate when trying to scroll BEYOND the boundary (can't scroll further)
+                at_boundary = False
+                if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
+                    # At left edge trying to scroll further left, or at right edge trying to scroll further right
+                    if (touch.dx < 0 and self.scroll_x <= 0) or (touch.dx > 0 and self.scroll_x >= 1):
+                        at_boundary = True
+                        print(f"Inner ScrollView: At horizontal boundary (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
+                elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling  
+                    # At top trying to scroll further up, or at bottom trying to scroll further down
+                    if (touch.dy < 0 and self.scroll_y >= 1) or (touch.dy > 0 and self.scroll_y <= 0):
+                        at_boundary = True
+                        print(f"Inner ScrollView: At vertical boundary (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
+                
+                if at_boundary:
+                    print(f"Inner ScrollView: Boundary delegation - passing to outer ScrollView")
+                    return False  # Let manager handle delegation to outer
             
             not_in_bar = not touch.ud.get('in_bar_x', False) and \
                 not touch.ud.get('in_bar_y', False)

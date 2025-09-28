@@ -21,11 +21,11 @@ Touch scrolling behavior:
 - For orthogonal ScrollViews Touch scrolling is handled by the scrollview
   that matches the direction of the touch.
 - For parallel ScrollViews Touch scrolling is handled by the scrollview
-  the touch is touching.  When scrolling the inner scrollview hits its boundary
-  the scroll is propagated to the outer scrollview.
+  that is touched.  When scrolling the inner scrollview 
+  hits its boundary the scroll is propagated to the outer scrollview.
 """
 
-#TODO: implement mousewheel scrolling behagior for parallel scrolling.
+
 #TODO: update scroll_events so they work as expected.
 #TODO: Evaluate integration of the Mnaager in the ScrollView.
 #TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
@@ -108,13 +108,54 @@ class NestedScrollViewManager(RelativeLayout):
         wheel_scroll = 'button' in touch.profile and touch.button.startswith('scroll')
         in_bar = in_bar_x or in_bar_y
         print(f"outer_scrollview:  in_bar: {in_bar}, wheel_scroll: {wheel_scroll}")
-        if in_bar or wheel_scroll: 
+        
+        # MOUSE WHEEL SPECIAL HANDLING:
+        if wheel_scroll:
+            # For mouse wheel events, check if we have parallel scrollviews
+            if inner_scrollview:
+                outer_axes = (outer_scrollview.do_scroll_x, outer_scrollview.do_scroll_y)
+                inner_axes = (inner_scrollview.do_scroll_x, inner_scrollview.do_scroll_y)
+                are_parallel = outer_axes == inner_axes
+                
+                if are_parallel:
+                    print(f"Parallel scrollviews detected - using position-based wheel routing")
+                    # For parallel scrollviews, determine which one the mouse is over
+                    # Check if mouse is over inner scrollview first
+                    touch.pop()
+                    touch.push()
+                    touch.apply_transform_2d(inner_scrollview.parent.to_widget)
+                    if inner_scrollview.collide_point(*touch.pos):
+                        print(f"Mouse wheel over inner scrollview - routing to inner")
+                        if inner_scrollview.dispatch('on_scroll_start', touch):
+                            touch.pop()
+                            touch.grab(self)
+                            touch.ud['nsvm']['mode'] = 'inner'
+                            print(f"Inner ScrollView accepted wheel touch, mode set to 'inner'")
+                            return True
+                    else:
+                        print(f"Mouse wheel over outer scrollview - routing to outer")
+                        touch.pop()
+                        touch.push()
+                        touch.apply_transform_2d(outer_scrollview.parent.to_widget)
+                        if outer_scrollview.dispatch('on_scroll_start', touch):
+                            touch.pop()
+                            touch.grab(self)
+                            touch.ud['nsvm']['mode'] = 'outer'
+                            print(f"Outer ScrollView accepted wheel touch, mode set to 'outer'")
+                            return True
+                    touch.pop()
+                    return False
+            
+            # For orthogonal scrollviews or single scrollview, use original wheel logic
             if outer_scrollview.dispatch('on_scroll_start', touch):
                 touch.pop()
                 touch.grab(self)
                 touch.ud['nsvm']['mode'] = 'outer'
-                print(f"Outer ScrollView accepted touch, mode set to 'outer'")
+                print(f"Outer ScrollView accepted wheel touch, mode set to 'outer'")
                 return True
+        
+        # NORMAL TOUCH HANDLING:
+        # First check if touch is on inner scrollview
         if inner_scrollview:
             touch.pop()
             touch.push()
@@ -125,6 +166,19 @@ class NestedScrollViewManager(RelativeLayout):
                 print(f"Inner ScrollView accepted touch, mode set to 'inner'")
                 touch.ud['nsvm']['mode'] = 'inner'
                 return True
+        
+        # If not handled by inner (or no inner), try outer scrollview
+        # This handles both bar touches and content touches on outer scrollview
+        touch.pop()
+        touch.push()
+        touch.apply_transform_2d(outer_scrollview.parent.to_widget)
+        if outer_scrollview.dispatch('on_scroll_start', touch):
+            touch.pop()
+            touch.grab(self)
+            touch.ud['nsvm']['mode'] = 'outer'
+            print(f"Outer ScrollView accepted touch, mode set to 'outer'")
+            return True
+            
         touch.pop()
         return False
         
