@@ -101,7 +101,6 @@ class NestedScrollViewManager(RelativeLayout):
             'mode': None # 'inner' or 'outer'
         }
 
-        # pass touch to outer scrollview, look for mouse wheel scroll or bar touch
         touch.push()
         touch.apply_transform_2d(outer_scrollview.parent.to_widget)
         in_bar_x, in_bar_y = outer_scrollview._check_scroll_bounds(touch)
@@ -146,7 +145,7 @@ class NestedScrollViewManager(RelativeLayout):
                     touch.pop()
                     return False
             
-            # For orthogonal scrollviews or single scrollview, use original wheel logic
+            # For orthogonal scrollviews or not inner scrollview touched, outer scrollview handles the wheel
             if outer_scrollview.dispatch('on_scroll_start', touch):
                 touch.pop()
                 touch.grab(self)
@@ -320,7 +319,7 @@ class NestedScrollViewManager(RelativeLayout):
                     if not touch.ud[uid].get('can_defocus', True):
                         FocusBehavior.ignored_touch.append(touch)
                 touch.pop()
-                
+                    
             elif mode == 'outer' and self.outer_scrollview:
                 print(f"   Cleaning up outer ScrollView")
                 # Transform and dispatch scroll stop
@@ -340,22 +339,14 @@ class NestedScrollViewManager(RelativeLayout):
             else:
                 print(f"   Invalid mode: {mode}")  # TODO: raise error?
                 return False
-            
+                
             return True
         
         # For touches not managed by this manager, delegate to children
         # This is critical for button/widget interactions that aren't scroll gestures
-        # Only delegate if this touch was never managed by the nested scroll system
-        if not touch.ud.get('nsvm', False) and self.collide_point(*touch.pos):
-            # Transform touch to local coordinates and pass to children
-            touch.push()
-            touch.apply_transform_2d(self.to_local)
-            if super(NestedScrollViewManager, self).on_touch_up(touch):
-                touch.pop()
-                return True
-            touch.pop()
-        
-        return False
+        # Always delegate to children - this ensures buttons get their touch_up events
+        # The manager only handles scroll cleanup above, everything else goes to children
+        return super(NestedScrollViewManager, self).on_touch_up(touch)
         
     
         

@@ -1293,9 +1293,17 @@ class ScrollView(StencilView):
             
         # Stop scroll effects if they were active (not for bar interactions)
         if self.do_scroll_x and self.effect_x and not_in_bar:
-            self.effect_x.stop(touch.x)
+            try:
+                self.effect_x.stop(touch.x)
+            except IndexError:
+                # Handle case where effect history is empty (e.g., from delegation)
+                pass
         if self.do_scroll_y and self.effect_y and not_in_bar:
-            self.effect_y.stop(touch.y)
+            try:
+                self.effect_y.stop(touch.y)
+            except IndexError:
+                # Handle case where effect history is empty (e.g., from delegation)
+                pass
             
         # CLICK PASSTHROUGH LOGIC
         # If the gesture never transitioned from 'unknown' to 'scroll' mode,
