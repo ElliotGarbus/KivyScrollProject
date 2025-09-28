@@ -29,8 +29,10 @@ Touch scrolling behavior:
 #TODO: update scroll_events so they work as expected.
 #TODO: Evaluate integration of the Mnaager in the ScrollView.
 #TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
-#TODO: create a test suite for the updated ScrollView for the kivy test suite.
+#TODO: create a test suite for the updated ScrollView & NSVMfor the kivy test suite.
 #TODO: Update documention that describes the expected behavior of nested scrollviews.
+#TODO: remove debug print statements.
+#TODO: clean up code/implementaion comments.
 
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior

@@ -1,5 +1,5 @@
 """
-THIS FILE IS MODIFIED FROM THE KIVY SCROLLVIEW FILE
+THIS FILE IS MODIFIED FROM THE KIVY SCROLLVIEW FILE  - WIP - NOT READY FOR USE
 The modifications allow Orthoganal nested ScrollViews to work as expected.
 A movement on the inner ScrollView will not be blocked by the outer ScrollView.
 
