@@ -1146,8 +1146,8 @@ class ScrollView(StencilView):
                 # Only delegate when trying to scroll BEYOND the boundary (can't scroll further)
                 at_boundary = False
                 if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
-                    # At left edge trying to scroll further left, or at right edge trying to scroll further right
-                    if (touch.dx < 0 and self.scroll_x <= 0) or (touch.dx > 0 and self.scroll_x >= 1):
+                    # At left edge trying to scroll further right, or at right edge trying to scroll further left
+                    if (touch.dx > 0 and self.scroll_x <= 0) or (touch.dx < 0 and self.scroll_x >= 1):
                         at_boundary = True
                         print(f"Inner ScrollView: At horizontal boundary (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
                 elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling  
