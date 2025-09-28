@@ -234,55 +234,67 @@ class NestedScrollViewManager(RelativeLayout):
             touch: The touch event to handle
             
         Returns:
-            bool: True if the touch is handled by this manager
+            bool: True if the touch is handled by this manager or its children
         """
-        if not touch.ud.get('nsvm', False):
-            return False
+        # First, handle touches that this manager is actively managing
+        if touch.ud.get('nsvm', False) and touch.grab_current is self:
+            touch.ungrab(self)
 
-        if touch.grab_current is not self:
-            return False
-        touch.ungrab(self)
-
-        mode = touch.ud['nsvm'].get('mode')
-        print(f"Touch up, mode: {mode}")
+            mode = touch.ud['nsvm'].get('mode')
+            print(f"Touch up, mode: {mode}")
+            
+            if mode == 'inner' and self.inner_scrollview:
+                print(f"   Cleaning up inner ScrollView")
+                # Transform and dispatch scroll stop
+                touch.push()
+                touch.apply_transform_2d(self.inner_scrollview.parent.to_widget)
+                
+                # Update effect bounds before stopping
+                self.inner_scrollview._update_effect_bounds()
+                
+                uid = self.inner_scrollview._get_uid()
+                if uid in touch.ud:
+                    # Normal scroll stop
+                    self.inner_scrollview.dispatch('on_scroll_stop', touch)
+                    if not touch.ud[uid].get('can_defocus', True):
+                        FocusBehavior.ignored_touch.append(touch)
+                touch.pop()
+                
+            elif mode == 'outer' and self.outer_scrollview:
+                print(f"   Cleaning up outer ScrollView")
+                # Transform and dispatch scroll stop
+                touch.push()
+                touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
+                
+                # Update effect bounds before stopping
+                self.outer_scrollview._update_effect_bounds()
+                
+                uid = self.outer_scrollview._get_uid()
+                if uid in touch.ud:
+                    # Normal scroll stop
+                    self.outer_scrollview.dispatch('on_scroll_stop', touch)
+                    if not touch.ud[uid].get('can_defocus', True):
+                        FocusBehavior.ignored_touch.append(touch)
+                touch.pop()
+            else:
+                print(f"   Invalid mode: {mode}")  # TODO: raise error?
+                return False
+            
+            return True
         
-        if mode == 'inner' and self.inner_scrollview:
-            print(f"   Cleaning up inner ScrollView")
-            # Transform and dispatch scroll stop
+        # For touches not managed by this manager, delegate to children
+        # This is critical for button/widget interactions that aren't scroll gestures
+        # Only delegate if this touch was never managed by the nested scroll system
+        if not touch.ud.get('nsvm', False) and self.collide_point(*touch.pos):
+            # Transform touch to local coordinates and pass to children
             touch.push()
-            touch.apply_transform_2d(self.inner_scrollview.parent.to_widget)
-            
-            # Update effect bounds before stopping
-            self.inner_scrollview._update_effect_bounds()
-            
-            uid = self.inner_scrollview._get_uid()
-            if uid in touch.ud:
-                # Normal scroll stop
-                self.inner_scrollview.dispatch('on_scroll_stop', touch)
-                if not touch.ud[uid].get('can_defocus', True):
-                    FocusBehavior.ignored_touch.append(touch)
+            touch.apply_transform_2d(self.to_local)
+            if super(NestedScrollViewManager, self).on_touch_up(touch):
+                touch.pop()
+                return True
             touch.pop()
-            
-        elif mode == 'outer' and self.outer_scrollview:
-            print(f"   Cleaning up outer ScrollView")
-            # Transform and dispatch scroll stop
-            touch.push()
-            touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
-            
-            # Update effect bounds before stopping
-            self.outer_scrollview._update_effect_bounds()
-            
-            uid = self.outer_scrollview._get_uid()
-            self.outer_scrollview.dispatch('on_scroll_stop', touch)
-            if uid in touch.ud and not touch.ud[uid].get('can_defocus', True):
-                FocusBehavior.ignored_touch.append(touch)
-            touch.pop()
-        else:
-            print(f"   Invalid mode: {mode}")  # TODO: raise error?
-            return False
         
-        # Release grab
-        return True
+        return False
         
     
         

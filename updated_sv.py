@@ -679,9 +679,24 @@ class ScrollView(StencilView):
         # used when a touch gesture is determined to be a click rather than a scroll.
         touch.push()
         touch.apply_transform_2d(self.to_local)
-        if 'nsvm' in touch.ud:
-            touch.ungrab(touch.ud['nsvm']['nested_managed'])  
+        
+        # Store original grab state to restore later if needed
+        original_grab_current = getattr(touch, 'grab_current', None)
+        
+        # Only ungrab nested manager if we're currently grabbed by it
+        # This prevents interfering with the manager's touch_up handling
+        if 'nsvm' in touch.ud and touch.grab_current == touch.ud['nsvm']['nested_managed']:
+            touch.ungrab(touch.ud['nsvm']['nested_managed'])
+            
         ret = super(ScrollView, self).on_touch_down(touch)
+        
+        # If we ungrabbed the manager and no child grabbed the touch, restore the grab
+        # This ensures the manager can still handle touch_up properly
+        if ('nsvm' in touch.ud and 
+            original_grab_current == touch.ud['nsvm']['nested_managed'] and 
+            touch.grab_current is None):
+            touch.grab(touch.ud['nsvm']['nested_managed'])
+            
         touch.pop()
         return ret
 
@@ -1276,8 +1291,8 @@ class ScrollView(StencilView):
             # (e.g., no scroll bar interaction or dragging)
             if not ud['scroll_action']:
                 self.simulate_touch_down(touch)  # Let children handle the "click"
-            # Schedule delayed touch up to complete the click simulation
-            Clock.schedule_once(partial(self._do_touch_up, touch), .2)
+                # Schedule delayed touch up to complete the click simulation
+                Clock.schedule_once(partial(self._do_touch_up, touch), .2)
 
         # Update effect bounds after scroll completion
         ev = self._update_effect_bounds_ev
@@ -1528,6 +1543,8 @@ class ScrollView(StencilView):
         # CONTROLLED HANDOFF TO CHILD WIDGETS:
         # Transform touch coordinates and re-dispatch to children
         # This allows buttons, sliders, etc. to handle the touch normally
+        # NOTE: Do NOT schedule _do_touch_up here - this is a live touch handoff,
+        # not a synthetic click. The user is still holding their finger down.
         touch.push()
         touch.apply_transform_2d(self.to_widget)
         touch.apply_transform_2d(self.to_parent)
