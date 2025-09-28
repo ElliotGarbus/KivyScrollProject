@@ -17,6 +17,13 @@ Features:
 - Simplified two-state system: 'inner' and 'outer' modes
 """
 
+#TODO: Add tests for nested scrollviews with parallel scrolling.
+#TODO: define mousewheel scrolling behagior for parallel scrolling.
+#TODO: update scroll_events so they work as expected.
+#TODO: Evaluate integration of the Mnaager in the ScrollView.
+#TODO: create a test suite for the updated ScrollView for the kivy test suite.
+#TODO: Update documention that describes the expected behavior of nested scrollviews.
+
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior
 from kivy.clock import Clock
