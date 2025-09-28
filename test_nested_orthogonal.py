@@ -1,29 +1,7 @@
 """
-Interactive nested demo copied from test_nested_scrollviews.py.
+Interactive nested demo
 Demo showing the nested scroll manager in action.
-
-NestedScrollViewManager Role:
-============================
-The NestedScrollViewManager acts as a centralized touch routing coordinator for nested
-ScrollViews. It solves the complex problem of determining which ScrollView should handle
-touch events when multiple ScrollViews are nested (e.g., horizontal ScrollViews inside
-vertical ScrollViews, or vice versa).
-
-Key responsibilities:
-- Touch Event Routing: Intercepts touch events and determines which ScrollView should
-  handle them based on touch position, scrollability, and axis capabilities.
-- Bar Priority: Prioritizes scroll bar interactions over content scrolling to ensure
-  precise bar dragging works correctly in nested scenarios.
-- Single Active Owner: Maintains only one active ScrollView per touch to prevent
-  conflicts and ensure smooth scrolling behavior.
-- Wheel Event Management: Routes mouse wheel events to the appropriate inner ScrollView
-  first, falling back to outer ScrollViews when inner ones can't scroll further.
-- Debug Logging: Provides rich debugging information about touch ownership decisions
-  and axis routing for troubleshooting nested scroll issues.
-
-Without the manager, nested ScrollViews would compete for the same touch events,
-leading to erratic behavior, missed touches, or multiple ScrollViews trying to
-scroll simultaneously. The manager ensures clean handoffs and predictable behavior.
+Test orthogonal nested scrollview
 """
 
 from kivy.app import App

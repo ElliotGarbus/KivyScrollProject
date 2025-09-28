@@ -1,3 +1,8 @@
+"""
+Test of kivy 3.2.1 parallel nested vertical behavior
+"""
+
+
 from kivy.app import App
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout

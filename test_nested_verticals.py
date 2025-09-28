@@ -1,5 +1,6 @@
 """
 Test file for demonstrating nested ScrollViews with parallel scrolling.
+Nested Parallel Vertical Scrolling
 """
 
 from kivy.app import App
