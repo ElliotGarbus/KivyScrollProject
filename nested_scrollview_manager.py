@@ -6,19 +6,26 @@ It manages touch events between outer and inner ScrollViews to prevent conflicts
 and ensure proper event flow.
 
 Key Design Decisions:
-1. Touch Management: Manager grabs all touches and controls routing
+1. Touch Management: controls touch routing between outer and inner ScrollViews
 2. State Tracking: Uses touch.ud keys to track nested scroll state
 3. Touch Router Pattern: Centralizes all touch handling logic
 4. Orthogonal Delegation: Uses sv.handled axis tracking for automatic delegation
 
-Features:
-- Automatic orthogonal scroll delegation (unhandled axes passed to outer ScrollView)
-- Axis-specific coordination via sv.handled mechanism
-- Simplified two-state system: 'inner' and 'outer' modes
+Mouse wheel scrolling behavior: 
+- For orthogonal ScrollViews Mouse wheel scrolling is handled by the scrollview
+  that matches the direction of the scroll wheel.
+- For parallel ScrollViews Mouse wheel scrolling is handled by the scrollview
+  the mouse is touching.  Scrolling is not propagated to the other scrollview.
+
+Touch scrolling behavior:
+- For orthogonal ScrollViews Touch scrolling is handled by the scrollview
+  that matches the direction of the touch.
+- For parallel ScrollViews Touch scrolling is handled by the scrollview
+  the touch is touching.  When scrolling the inner scrollview hits its boundary
+  the scroll is propagated to the outer scrollview.
 """
 
-#TODO: Add tests for nested scrollviews with parallel scrolling.
-#TODO: define mousewheel scrolling behagior for parallel scrolling.
+#TODO: implement mousewheel scrolling behagior for parallel scrolling.
 #TODO: update scroll_events so they work as expected.
 #TODO: Evaluate integration of the Mnaager in the ScrollView.
 #TODO: create feature, dwelling on a non-button widget can be turned into a scroll.

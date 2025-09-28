@@ -1043,10 +1043,11 @@ class ScrollView(StencilView):
 
     def on_touch_move(self, touch):
         print(f"on_touch_move: entered in update_sv.py")
-        # if self._touch is not touch:
-        #     print(f"on_touch_move: self._touch is not touch")
-        #     self._delegate_to_children(touch, 'on_touch_move')
-        #     return self._get_uid() in touch.ud
+        
+        # SINGLE-TOUCH POLICY: Only process our designated touch
+        if self._touch is not touch:
+            print(f"on_touch_move: self._touch is not touch, delegating to children")
+            return self._delegate_to_children(touch, 'on_touch_move')
         
         # Ensure we have grab ownership before processing
         if touch.grab_current is not self:
