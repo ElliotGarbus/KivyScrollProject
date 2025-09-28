@@ -12,4 +12,9 @@ My objective is to deliver a solution that is more maintainable both for ScrollV
 Key files:
  - nested_scrollview_manager.py - The NestedScrollViewManager
  - updated_sv.py - ScrollView simplified and adapted to work with the NestedScrollViewManager
- - demo_NSVM.py - a sample nested scrollview
+
+ - test_nested_orthogonal.py - a sample nested orthogonal scrollview
+ - test_nested_horizontal.py - nested parallel horiztonal scrollviews
+ - test_nested_vertical.py - nested parallel vertical scrollviews
+
+ The NestedScrollViewManger is not registered.  Register if you want to use with kv.

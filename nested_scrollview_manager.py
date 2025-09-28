@@ -34,10 +34,10 @@ Touch scrolling behavior:
 #TODO: Update documention that describes the expected behavior of nested scrollviews.
 #TODO: remove debug print statements.
 #TODO: clean up code/implementaion comments.
+#TODO: Register the NestedScrollViewManager with kv.
 
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior
-from kivy.clock import Clock
 from updated_sv import ScrollView
 
 
