@@ -1,5 +1,5 @@
 """
-Test file for demonstrating nested ScrollViews with parallel scrolling.
+demonstrating nested ScrollViews with parallel scrolling.
 Nested Parallel Vertical Scrolling
 """
 

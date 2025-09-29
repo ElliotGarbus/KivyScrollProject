@@ -356,5 +356,5 @@ class NestedScrollViewManager(RelativeLayout):
         
             
 if __name__ == '__main__':
-    from test_nested_orthogonal import NestedScrollViewDemo
+    from demo_nested_orthogonal import NestedScrollViewDemo
     NestedScrollViewDemo().run()
