@@ -17,12 +17,15 @@ Mouse wheel scrolling behavior:
 - For parallel ScrollViews Mouse wheel scrolling is handled by the scrollview
   the mouse is touching.  Scrolling is not propagated to the other scrollview.
 
-Touch scrolling behavior:
+Content Touch scrolling behavior:
 - For orthogonal ScrollViews Touch scrolling is handled by the scrollview
   that matches the direction of the touch.
 - For parallel ScrollViews Touch scrolling is handled by the scrollview
   that is touched.  When scrolling the inner scrollview 
   hits its boundary the scroll is propagated to the outer scrollview.
+
+Scrollbar scrolling behavior:
+- For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
 """
 
 #TODO: create nested xy tests
@@ -31,7 +34,6 @@ Touch scrolling behavior:
 #TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
 #TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
 #TODO: test interation with draggable widgets. 
-#TODO: Update documentation that describes the expected behavior of nested scrollviews.
 #TODO: remove debug print statements.
 #TODO: clean up code/implementation comments.
 #TODO: Register the NestedScrollViewManager with kv.

@@ -1295,17 +1295,18 @@ class ScrollView(StencilView):
             not touch.ud.get('in_bar_y', False)
             
         # Stop scroll effects if they were active (not for bar interactions)
+        # Edge case: If orthogonal/boundary delegation occurred on the first touch move,
+        # the effect was started but never updated, leaving insufficient history for stop().
+        # The try/except gracefully handles this  edge case.
         if self.do_scroll_x and self.effect_x and not_in_bar:
             try:
                 self.effect_x.stop(touch.x)
             except IndexError:
-                # Handle case where effect history is empty (e.g., from delegation)
                 pass
         if self.do_scroll_y and self.effect_y and not_in_bar:
             try:
                 self.effect_y.stop(touch.y)
             except IndexError:
-                # Handle case where effect history is empty (e.g., from delegation)
                 pass
             
         # CLICK PASSTHROUGH LOGIC
