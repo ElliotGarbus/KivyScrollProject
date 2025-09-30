@@ -158,6 +158,16 @@ class NestedScrollViewManager(RelativeLayout):
                 return True
         
         # NORMAL TOUCH HANDLING:
+        # If touch is on outer scrollbar, handle it directly (don't check inner)
+        if in_bar:
+            print(f"Touch on outer scrollbar - routing directly to outer")
+            if outer_scrollview.dispatch('on_scroll_start', touch):
+                touch.pop()
+                touch.grab(self)
+                touch.ud['nsvm']['mode'] = 'outer'
+                print(f"Outer ScrollView accepted bar touch, mode set to 'outer'")
+                return True
+        
         # First check if touch is on inner scrollview
         if inner_scrollview:
             touch.pop()
@@ -171,7 +181,7 @@ class NestedScrollViewManager(RelativeLayout):
                 return True
         
         # If not handled by inner (or no inner), try outer scrollview
-        # This handles both bar touches and content touches on outer scrollview
+        # This handles content touches on outer scrollview
         touch.pop()
         touch.push()
         touch.apply_transform_2d(outer_scrollview.parent.to_widget)

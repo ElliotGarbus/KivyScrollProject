@@ -1128,7 +1128,12 @@ class ScrollView(StencilView):
             # NESTED SCROLLVIEW DELEGATION CHECK:
             # Only inner ScrollViews should delegate to outer ScrollViews
             # Outer ScrollViews (mode='outer') should not delegate further
-            if 'nsvm' in touch.ud and touch.ud['nsvm'].get('mode') == 'inner':
+            # Check if scrolling via scrollbar or content
+            not_in_bar = not touch.ud.get('in_bar_x', False) and \
+                not touch.ud.get('in_bar_y', False)
+            
+            # NESTED SCROLLVIEW DELEGATION (only for content scrolling, NOT scrollbar dragging)
+            if 'nsvm' in touch.ud and touch.ud['nsvm'].get('mode') == 'inner' and not_in_bar:
                 abs_dx = abs(touch.dx)
                 abs_dy = abs(touch.dy)
                 
@@ -1144,6 +1149,7 @@ class ScrollView(StencilView):
                 
                 # PARALLEL BOUNDARY DELEGATION: delegate if at scroll boundary in parallel setup
                 # Only delegate when trying to scroll BEYOND the boundary (can't scroll further)
+                # Only applies to CONTENT scrolling, not scrollbar dragging
                 at_boundary = False
                 if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
                     # At left edge trying to scroll further right, or at right edge trying to scroll further left
@@ -1159,9 +1165,6 @@ class ScrollView(StencilView):
                 if at_boundary:
                     print(f"Inner ScrollView: Boundary delegation - passing to outer ScrollView")
                     return False  # Let manager handle delegation to outer
-            
-            not_in_bar = not touch.ud.get('in_bar_x', False) and \
-                not touch.ud.get('in_bar_y', False)
 
             if not touch.ud['sv.handled']['x'] and self.do_scroll_x \
                     and self.effect_x:
