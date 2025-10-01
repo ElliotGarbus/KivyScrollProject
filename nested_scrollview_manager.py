@@ -37,6 +37,7 @@ Scrollbar scrolling behavior:
 #TODO: remove debug print statements.
 #TODO: clean up code/implementation comments.
 #TODO: Register the NestedScrollViewManager with kv.
+#TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx (seach for use)
 #TODO: formatting prior to PR
 
 from kivy.uix.relativelayout import RelativeLayout
