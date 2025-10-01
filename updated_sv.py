@@ -959,6 +959,126 @@ class ScrollView(StencilView):
                 effect.velocity = 0
 
 
+    def _handle_scrollbar_jump(self, touch, in_bar_x, in_bar_y):
+        """Handle scrollbar position jump when clicking in bar but not handle."""
+        ud = touch.ud
+        if in_bar_y and not self._touch_in_handle(self._handle_y_pos, self._handle_y_size, touch):
+            self.scroll_y = (touch.y - self.y) / self.height
+        elif in_bar_x and not self._touch_in_handle(self._handle_x_pos, self._handle_x_size, touch):
+            self.scroll_x = (touch.x - self.x) / self.width
+        
+        e = self.effect_y if in_bar_y else self.effect_x
+        if e:
+            self._update_effect_bounds()
+            e.velocity = 0
+            e.overscroll = 0
+            e.trigger_velocity_update()
+
+    def _initialize_scroll_effects(self, touch, in_bar):
+        """Initialize scroll effects for both axes if enabled."""
+        if self.do_scroll_x and self.effect_x and not in_bar:
+            self._update_effect_bounds()
+            self._effect_x_start_width = self.width
+            self.effect_x.start(touch.x)
+        
+        if self.do_scroll_y and self.effect_y and not in_bar:
+            self._update_effect_bounds()
+            self._effect_y_start_height = self.height
+            self.effect_y.start(touch.y)
+
+    def _should_delegate_orthogonal(self, touch):
+        """Check if touch movement is orthogonal to scroll direction."""
+        abs_dx = abs(touch.dx)
+        abs_dy = abs(touch.dy)
+        primarily_horizontal = abs_dx > abs_dy and not self.do_scroll_x
+        primarily_vertical = abs_dy > abs_dx and not self.do_scroll_y
+        return primarily_horizontal or primarily_vertical
+
+    def _is_at_boundary_for_delegation(self, touch):
+        """Check if at scroll boundary and trying to scroll beyond it."""
+        abs_dx = abs(touch.dx)
+        abs_dy = abs(touch.dy)
+        
+        if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
+            if (touch.dx > 0 and self.scroll_x <= 0) or (touch.dx < 0 and self.scroll_x >= 1):
+                print(f"Inner ScrollView: At horizontal boundary (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
+                return True
+        elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling
+            if (touch.dy < 0 and self.scroll_y >= 1) or (touch.dy > 0 and self.scroll_y <= 0):
+                print(f"Inner ScrollView: At vertical boundary (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
+                return True
+        return False
+
+    def _process_scroll_axis_x(self, touch, not_in_bar):
+        """Process X-axis scroll movement."""
+        if touch.ud['sv.handled']['x'] or not self.do_scroll_x or not self.effect_x:
+            return False
+        
+        print(f"PROCESSING X-AXIS: do_scroll_x={self.do_scroll_x}, effect_x={self.effect_x}, handled={touch.ud['sv.handled']['x']}")
+        width = self.width
+        if touch.ud.get('in_bar_x', False):
+            if self.hbar[1] != 1:
+                dx = touch.dx / float(width - width * self.hbar[1])
+                self.scroll_x = min(max(self.scroll_x + dx, 0.), 1.)
+                self._trigger_update_from_scroll()
+        elif not_in_bar:
+            print(f"EFFECT UPDATE X: touch.x={touch.x}, self.effect_x={self.effect_x}")
+            self.effect_x.update(touch.x)
+        
+        touch.ud['sv.handled']['x'] = True
+        
+        # Let effects handle boundary behavior (bouncing, overscroll)
+        if self.scroll_x < 0 or self.scroll_x > 1:
+            print(f"SCROLL BOUNDARY: scroll_x={self.scroll_x}, letting effects handle boundary behavior")
+        
+        touch.ud['sv.can_defocus'] = False
+        return True
+
+    def _process_scroll_axis_y(self, touch, not_in_bar):
+        """Process Y-axis scroll movement."""
+        if touch.ud['sv.handled']['y'] or not self.do_scroll_y or not self.effect_y:
+            return False
+        
+        print(f"PROCESSING Y-AXIS: do_scroll_y={self.do_scroll_y}, effect_y={self.effect_y}, handled={touch.ud['sv.handled']['y']}")
+        height = self.height
+        if touch.ud.get('in_bar_y', False) and self.vbar[1] != 1.0:
+            dy = touch.dy / float(height - height * self.vbar[1])
+            self.scroll_y = min(max(self.scroll_y + dy, 0.), 1.)
+            self._trigger_update_from_scroll()
+        elif not_in_bar:
+            print(f"EFFECT UPDATE Y: touch.y={touch.y}, effect_value_before={self.effect_y.value}")
+            self.effect_y.update(touch.y)
+            print(f"EFFECT UPDATE Y: effect_value_after={self.effect_y.value}, scroll_y={self.scroll_y}")
+            self._trigger_update_from_scroll()
+        
+        touch.ud['sv.handled']['y'] = True
+        
+        # Let effects handle boundary behavior (bouncing, overscroll)
+        if self.scroll_y < 0 or self.scroll_y > 1:
+            print(f"SCROLL BOUNDARY: scroll_y={self.scroll_y}, letting effects handle boundary behavior")
+        
+        touch.ud['sv.can_defocus'] = False
+        return True
+
+    def _stop_scroll_effects(self, touch, not_in_bar):
+        """Stop scroll effects for both axes with edge case handling.
+        
+        Edge case: If orthogonal/boundary delegation occurred on the first touch move,
+        the effect was started but never updated, leaving insufficient history for stop().
+        The try/except gracefully handles this edge case.
+        """
+        if self.do_scroll_x and self.effect_x and not_in_bar:
+            try:
+                self.effect_x.stop(touch.x)
+            except IndexError:
+                pass  # Effect was started but delegated before being used
+        
+        if self.do_scroll_y and self.effect_y and not_in_bar:
+            try:
+                self.effect_y.stop(touch.y)
+            except IndexError:
+                pass  # Effect was started but delegated before being used
+
     def on_scroll_start(self, touch, check_children=True):
         if not self.collide_point(*touch.pos):
             touch.ud[self._get_uid('svavoid')] = True
@@ -998,22 +1118,7 @@ class ScrollView(StencilView):
             return self.simulate_touch_down(touch)
         
         if in_bar:
-            # touch in the bar, but not the handle, jumps to that position in the scrollview
-            if (ud['in_bar_y'] and not
-                    self._touch_in_handle(
-                        self._handle_y_pos, self._handle_y_size, touch)):
-                self.scroll_y = (touch.y - self.y) / self.height
-            elif (ud['in_bar_x'] and not
-                    self._touch_in_handle(
-                        self._handle_x_pos, self._handle_x_size, touch)):
-                self.scroll_x = (touch.x - self.x) / self.width
-
-            e = self.effect_y if ud['in_bar_y'] else self.effect_x
-            if e:
-                self._update_effect_bounds()
-                e.velocity = 0
-                e.overscroll = 0
-                e.trigger_velocity_update()
+            self._handle_scrollbar_jump(touch, in_bar_x, in_bar_y)
 
         # no mouse scrolling, the user is going to drag the scrollview with
         # this touch.
@@ -1030,19 +1135,8 @@ class ScrollView(StencilView):
             'time': touch.time_start,
         }
 
-        if self.do_scroll_x and self.effect_x and not in_bar:
-            # make sure the effect's value is synced to scroll value
-            self._update_effect_bounds()
-
-            self._effect_x_start_width = self.width
-            self.effect_x.start(touch.x)
-
-        if self.do_scroll_y and self.effect_y and not in_bar:
-            # make sure the effect's value is synced to scroll value
-            self._update_effect_bounds()
-
-            self._effect_y_start_height = self.height
-            self.effect_y.start(touch.y)
+        # Initialize scroll effects for content scrolling
+        self._initialize_scroll_effects(touch, in_bar)
 
         if not in_bar:
             Clock.schedule_once(self._change_touch_mode,
@@ -1138,84 +1232,22 @@ class ScrollView(StencilView):
             
             # NESTED SCROLLVIEW DELEGATION (only for content scrolling, NOT scrollbar dragging)
             if 'nsvm' in touch.ud and touch.ud['nsvm'].get('mode') == 'inner' and not_in_bar:
-                abs_dx = abs(touch.dx)
-                abs_dy = abs(touch.dy)
-                
                 # ORTHOGONAL DELEGATION: delegate if movement is in unsupported direction
-                primarily_horizontal = abs_dx > abs_dy and not self.do_scroll_x
-                primarily_vertical = abs_dy > abs_dx and not self.do_scroll_y
-                
-                if primarily_horizontal or primarily_vertical:
+                if self._should_delegate_orthogonal(touch):
                     print(f"Inner ScrollView: Orthogonal movement detected - delegating (dx:{touch.dx:.1f}, dy:{touch.dy:.1f})")
                     print(f"ScrollView capabilities: do_scroll_x={self.do_scroll_x}, do_scroll_y={self.do_scroll_y}")
-                    print(f"Movement analysis: primarily_horizontal={primarily_horizontal}, primarily_vertical={primarily_vertical}")
                     return False  # Let manager handle delegation
                 
                 # PARALLEL BOUNDARY DELEGATION: delegate if at scroll boundary in parallel setup
                 # Only delegate when trying to scroll BEYOND the boundary (can't scroll further)
                 # Only applies to CONTENT scrolling, not scrollbar dragging
-                at_boundary = False
-                if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
-                    # At left edge trying to scroll further right, or at right edge trying to scroll further left
-                    if (touch.dx > 0 and self.scroll_x <= 0) or (touch.dx < 0 and self.scroll_x >= 1):
-                        at_boundary = True
-                        print(f"Inner ScrollView: At horizontal boundary (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
-                elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling  
-                    # At top trying to scroll further up, or at bottom trying to scroll further down
-                    if (touch.dy < 0 and self.scroll_y >= 1) or (touch.dy > 0 and self.scroll_y <= 0):
-                        at_boundary = True
-                        print(f"Inner ScrollView: At vertical boundary (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
-                
-                if at_boundary:
+                if self._is_at_boundary_for_delegation(touch):
                     print(f"Inner ScrollView: Boundary delegation - passing to outer ScrollView")
                     return False  # Let manager handle delegation to outer
 
-            if not touch.ud['sv.handled']['x'] and self.do_scroll_x \
-                    and self.effect_x:
-                print(f"PROCESSING X-AXIS: do_scroll_x={self.do_scroll_x}, effect_x={self.effect_x}, handled={touch.ud['sv.handled']['x']}")
-                width = self.width
-                if touch.ud.get('in_bar_x', False):
-                    if self.hbar[1] != 1:
-                        dx = touch.dx / float(width - width * self.hbar[1])
-                        self.scroll_x = min(max(self.scroll_x + dx, 0.), 1.)
-                        self._trigger_update_from_scroll()
-                elif not_in_bar:
-                    print(f"EFFECT UPDATE X: touch.x={touch.x}, self.effect_x={self.effect_x}")
-                    self.effect_x.update(touch.x)
-
-                # Always mark as handled for effects to work, even at boundaries
-                touch.ud['sv.handled']['x'] = True
-                
-                # Let effects handle boundary behavior (bouncing, overscroll)
-                if self.scroll_x < 0 or self.scroll_x > 1:
-                    print(f"SCROLL BOUNDARY: scroll_x={self.scroll_x}, letting effects handle boundary behavior")
-                # Touch resulted in scroll should not defocus focused widget
-                touch.ud['sv.can_defocus'] = False
-            if not touch.ud['sv.handled']['y'] and self.do_scroll_y \
-                    and self.effect_y:
-                print(f"PROCESSING Y-AXIS: do_scroll_y={self.do_scroll_y}, effect_y={self.effect_y}, handled={touch.ud['sv.handled']['y']}")
-                height = self.height
-                if touch.ud.get('in_bar_y', False) and self.vbar[1] != 1.0:
-                    dy = touch.dy / float(height - height * self.vbar[1])
-                    self.scroll_y = min(max(self.scroll_y + dy, 0.), 1.)
-                    self._trigger_update_from_scroll()
-                elif not_in_bar:
-                    print(f"EFFECT UPDATE Y: touch.y={touch.y}, effect_value_before={self.effect_y.value}")
-                    self.effect_y.update(touch.y)
-                    print(f"EFFECT UPDATE Y: effect_value_after={self.effect_y.value}, scroll_y={self.scroll_y}")
-                    # Force update from effect to scroll position
-                    self._trigger_update_from_scroll()
-
-                # Always mark as handled for effects to work, even at boundaries
-                touch.ud['sv.handled']['y'] = True
-                
-                # Let effects handle boundary behavior (bouncing, overscroll)
-                # Don't return False immediately - effects need to process boundaries
-                if self.scroll_y < 0 or self.scroll_y > 1:
-                    print(f"SCROLL BOUNDARY: scroll_y={self.scroll_y}, letting effects handle boundary behavior")
-                    # rv remains True to let effects handle the boundary
-                # Touch resulted in scroll should not defocus focused widget
-                touch.ud['sv.can_defocus'] = False
+            # Process scroll movement for each axis
+            self._process_scroll_axis_x(touch, not_in_bar)
+            self._process_scroll_axis_y(touch, not_in_bar)
             ud['dt'] = touch.time_update - ud['time']
             ud['time'] = touch.time_update
             ud['user_stopped'] = True
@@ -1294,19 +1326,7 @@ class ScrollView(StencilView):
             not touch.ud.get('in_bar_y', False)
             
         # Stop scroll effects if they were active (not for bar interactions)
-        # Edge case: If orthogonal/boundary delegation occurred on the first touch move,
-        # the effect was started but never updated, leaving insufficient history for stop().
-        # The try/except gracefully handles this  edge case.
-        if self.do_scroll_x and self.effect_x and not_in_bar:
-            try:
-                self.effect_x.stop(touch.x)
-            except IndexError:
-                pass
-        if self.do_scroll_y and self.effect_y and not_in_bar:
-            try:
-                self.effect_y.stop(touch.y)
-            except IndexError:
-                pass
+        self._stop_scroll_effects(touch, not_in_bar)
             
         # CLICK PASSTHROUGH LOGIC
         # If the gesture never transitioned from 'unknown' to 'scroll' mode,
