@@ -28,7 +28,6 @@ Scrollbar scrolling behavior:
 - For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
 """
 
-#TODO: create nested xy tests
 #TODO: update scroll_events so they work as expected.
 #TODO: Evaluate integration of the Manager in the ScrollView.
 #TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
@@ -37,7 +36,7 @@ Scrollbar scrolling behavior:
 #TODO: remove debug print statements.
 #TODO: clean up code/implementation comments.
 #TODO: Register the NestedScrollViewManager with kv.
-#TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx (seach for use)
+#TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx (search for use)
 #TODO: formatting prior to PR
 
 from kivy.uix.relativelayout import RelativeLayout
