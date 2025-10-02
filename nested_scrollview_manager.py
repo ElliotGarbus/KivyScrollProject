@@ -41,6 +41,7 @@ Scrollbar scrolling behavior:
 
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior
+from kivy.properties import BooleanProperty
 from updated_sv import ScrollView
 
 
@@ -51,6 +52,21 @@ class NestedScrollViewManager(RelativeLayout):
     This manager intercepts touch events and routes them appropriately between
     outer and inner ScrollViews, preventing conflicts and ensuring proper
     event flow in nested scrolling scenarios.
+    """
+    
+    parallel_delegation = BooleanProperty(True)
+    """
+    Controls boundary delegation for parallel nested ScrollViews.
+    
+    When True (web-style):
+    - Touch starting at inner boundary, moving away from boundary → delegates to outer scrollview
+    - else → scrolls inner only, never delegates
+    
+    When False:
+    - No delegation, only touched scrollview scrolls
+    - Inner scrollview shows overscroll effects at boundaries
+    
+    Default: True (web-style behavior)
     """
 
     def __init__(self, **kwargs):
@@ -101,10 +117,15 @@ class NestedScrollViewManager(RelativeLayout):
 
         # populate the touch.ud, use nsvm as the key to create a new namespace
         # mode: 'inner' or 'outer' - determines which ScrollView initially handles the touch
+        # delegation_mode: tracks web-style boundary delegation state
+        #   - 'unknown': touch did not start at boundary
+        #   - 'start_at_boundary': touch started at boundary, may delegate
+        #   - 'locked': delegating to outer, inner locked
         # orthogonal delegation is handled via sv.handled axis tracking
         touch.ud['nsvm'] = {
             'nested_managed': self,
-            'mode': None # 'inner' or 'outer'
+            'mode': None,  # 'inner' or 'outer'
+            'delegation_mode': 'unknown'  # Will be set in ScrollView.on_scroll_start
         }
 
         touch.push()
