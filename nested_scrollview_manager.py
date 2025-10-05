@@ -285,8 +285,20 @@ class NestedScrollViewManager(RelativeLayout):
                 if outer_uid not in touch.ud:
                     print(f"   Initializing outer ScrollView effects for delegation")
                     
+                    # CRITICAL: Create touch.ud[uid] entry for outer scrollview
+                    # Without this, on_scroll_move will call on_scroll_start (see line 1317-1320 in updated_sv.py)
+                    # which disrupts the touch flow and causes stuck buttons
+                    touch.ud[outer_uid] = {
+                        'mode': 'scroll',  # Already scrolling (delegated mid-gesture)
+                        'dx': 0,
+                        'dy': 0,
+                        'scroll_action': False,
+                        'frames': 0,  # Will be updated by ScrollView
+                        'can_defocus': False,  # Delegated touch shouldn't defocus
+                        'time': touch.time_start,
+                    }
+                    
                     # Initialize scroll effects with current touch position
-                    # Touch state (dx, dy, mode, etc.) is already set up - we just need effects
                     self.outer_scrollview._initialize_scroll_effects(touch, in_bar=False)
                     
                     # Set the active touch for outer scrollview
@@ -390,9 +402,14 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.pop()
             else:
                 print(f"   Invalid mode: {mode}")  # TODO: raise error?
-                return False
-                
-            return True
+                raise ValueError(f"Invalid mode: {mode}")
+                # Still delegate to children even if mode is invalid
+                return super(NestedScrollViewManager, self).on_touch_up(touch)
+            
+            # After cleaning up scroll state, always delegate to children
+            # This ensures buttons/widgets get their on_touch_up even if gesture became a scroll
+            # Critical for preventing stuck button states
+            return super(NestedScrollViewManager, self).on_touch_up(touch)
         
         # For touches not managed by this manager, delegate to children
         # This is critical for button/widget interactions that aren't scroll gestures
