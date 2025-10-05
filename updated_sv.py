@@ -1244,11 +1244,11 @@ class ScrollView(StencilView):
                 
                 # Check X boundary only if both inner and outer scroll horizontally
                 at_boundary_x = (self.do_scroll_x and outer.do_scroll_x and 
-                                (self.scroll_x <= 0.05 or self.scroll_x >= 0.95))
+                                (self.scroll_x <= 0.01 or self.scroll_x >= 0.99))
                 
                 # Check Y boundary only if both inner and outer scroll vertically  
                 at_boundary_y = (self.do_scroll_y and outer.do_scroll_y and 
-                                (self.scroll_y <= 0.05 or self.scroll_y >= 0.95))
+                                (self.scroll_y <= 0.01 or self.scroll_y >= 0.99))
                     
                 # Set delegation_mode based on boundary state in PARALLEL directions only
                 if at_boundary_x or at_boundary_y:
