@@ -62,11 +62,12 @@ class NestedScrollViewManager(RelativeLayout):
     - Touch starting at inner boundary, moving away from boundary → delegates to outer scrollview
     - else → scrolls inner only, never delegates
     
-    When False:
+    When False (default):
     - No delegation, only touched scrollview scrolls
     - Inner scrollview shows overscroll effects at boundaries
+    - Touch stays with initially touched scrollview for entire gesture
     
-    Default: True (web-style behavior)
+    Default: False (no boundary delegation)
     """
 
     def __init__(self, **kwargs):
@@ -201,6 +202,7 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.grab(self)  # Manager maintains grab ownership
                 print(f"Inner ScrollView accepted touch, mode set to 'inner'")
                 touch.ud['nsvm']['mode'] = 'inner'
+                print(f"  delegation_mode is now: '{touch.ud['nsvm']['delegation_mode']}'")
                 return True
         
         # If not handled by inner (or no inner), try outer scrollview
@@ -278,16 +280,29 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.push()
                 touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
                 
-                # Ensure outer ScrollView is properly initialized for scrolling
+                # Ensure outer ScrollView effects are initialized for scrolling
                 outer_uid = self.outer_scrollview._get_uid()
                 if outer_uid not in touch.ud:
-                    print(f"   Initializing outer ScrollView for delegation")
+                    print(f"   Initializing outer ScrollView effects for delegation")
                     
-                    # Initialize outer ScrollView normally with current touch position
-                    # This ensures effects get proper history initialization
-                    touch.grab(self.outer_scrollview)
-                    self.outer_scrollview.dispatch('on_scroll_start', touch)
+                    # Initialize scroll effects with current touch position
+                    # Touch state (dx, dy, mode, etc.) is already set up - we just need effects
+                    self.outer_scrollview._initialize_scroll_effects(touch, in_bar=False)
+                    
+                    # Set the active touch for outer scrollview
                     self.outer_scrollview._touch = touch
+                    
+                    # Grab for outer scrollview
+                    touch.grab(self.outer_scrollview)
+                    
+                    # Switch mode to 'outer' - inner is now locked, all scrolling goes to outer
+                    touch.ud['nsvm']['mode'] = 'outer'
+                    print(f"   Switched mode to 'outer' (inner locked, outer scrolling)")
+                    
+                    # Clear inner scrollview's _touch since it's no longer actively scrolling
+                    if self.inner_scrollview:
+                        self.inner_scrollview._touch = None
+                        print(f"   Cleared inner ScrollView._touch")
                 
                 # Reset sv.handled flags for delegation
                 touch.ud['sv.handled'] = {'x': False, 'y': False}

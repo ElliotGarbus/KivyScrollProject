@@ -686,7 +686,7 @@ class ScrollView(StencilView):
         # Only ungrab nested manager if we're currently grabbed by it
         # This prevents interfering with the manager's touch_up handling
         if 'nsvm' in touch.ud and touch.grab_current == touch.ud['nsvm']['nested_managed']:
-            touch.ungrab(touch.ud['nsvm']['nested_managed'])
+            touch.ungrab(touch.ud['nsvm']['nested_managed'])  
             
         ret = super(ScrollView, self).on_touch_down(touch)
         
@@ -987,30 +987,72 @@ class ScrollView(StencilView):
             self.effect_y.start(touch.y)
 
     def _should_delegate_orthogonal(self, touch):
-        """Check if touch movement is orthogonal to scroll direction."""
+        """Check if touch movement is orthogonal to scroll direction.
+        
+        CRITICAL: Only delegate in truly ORTHOGONAL nested setups where:
+        - Inner scrollview doesn't support the movement direction
+        - Outer scrollview DOES support the movement direction
+        
+        For PARALLEL setups (both scroll same direction), orthogonal delegation
+        should NEVER occur - touch stays with originally touched scrollview.
+        """
+        # If not in a nested managed setup, don't delegate
+        if 'nsvm' not in touch.ud or touch.ud['nsvm'].get('mode') != 'inner':
+            return False
+        
+        # Get the outer scrollview to check if it can handle orthogonal movement
+        manager = touch.ud['nsvm'].get('nested_managed')
+        if not manager or not manager.outer_scrollview:
+            return False
+        
+        outer = manager.outer_scrollview
+        
         abs_dx = abs(touch.dx)
         abs_dy = abs(touch.dy)
-        primarily_horizontal = abs_dx > abs_dy and not self.do_scroll_x
-        primarily_vertical = abs_dy > abs_dx and not self.do_scroll_y
-        return primarily_horizontal or primarily_vertical
-
-    def _is_at_boundary_for_delegation(self, touch):
-        """Check if at scroll boundary and trying to scroll beyond it.
         
-        Implements web-style boundary delegation based on delegation_mode:
-        - 'unknown': Never delegate (touch did not start at boundary)
+        # Only delegate if:
+        # 1. Movement is SIGNIFICANTLY orthogonal (2x threshold to avoid noise)
+        # 2. AND outer scrollview CAN scroll in that direction
+        
+        # Horizontal movement that inner can't handle, but outer can
+        if abs_dx > abs_dy * 2 and not self.do_scroll_x and outer.do_scroll_x:
+            return True
+        
+        # Vertical movement that inner can't handle, but outer can
+        if abs_dy > abs_dx * 2 and not self.do_scroll_y and outer.do_scroll_y:
+            return True
+        
+        return False
+
+    def _should_lock_at_boundary(self, touch):
+        """Check if scroll should lock at boundary (stop scrolling inner, no delegation in same gesture).
+        
+        Implements web-style boundary locking based on delegation_mode:
+        - 'unknown': Never lock (touch did not start at boundary)
         - 'start_at_boundary': Check if moving away from boundary → transition to 'locked' OR moved into content → 'unknown'
-        - 'locked': Always delegate (inner locked, outer scrolls)
+        - 'locked': Already locked, keep inner from scrolling
+        
+        Returns True if inner scrollview should stop scrolling (locked state).
+        Does NOT cause delegation to outer - that only happens on NEW touch.
         """
+        # CRITICAL: Only check boundary locking if parallel_delegation is enabled
+        # Otherwise, touches should never be locked/delegated based on boundaries
+        if 'nsvm' not in touch.ud:
+            return False
+        
+        manager = touch.ud['nsvm'].get('nested_managed')
+        if not manager or not manager.parallel_delegation:
+            return False
+        
         delegation_mode = touch.ud.get('nsvm', {}).get('delegation_mode', 'unknown')
         
-        # If not in delegation mode, never delegate
+        # If not in delegation mode, never lock
         if delegation_mode == 'unknown':
             return False
         
-        # If already locked, always delegate (inner doesn't scroll)
+        # If already locked, keep it locked (inner doesn't scroll, stays locked for this gesture)
         if delegation_mode == 'locked':
-            print(f"Inner ScrollView: delegation_mode='locked', delegating to outer")
+            print(f"Inner ScrollView: delegation_mode='locked', inner scrollview locked (not scrolling, not delegating)")
             return True
         
         # delegation_mode == 'start_at_boundary'
@@ -1021,36 +1063,36 @@ class ScrollView(StencilView):
         if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
             # Check if we've moved away from the boundary into content
             if 0.05 < self.scroll_x < 0.95:
-                print(f"Inner ScrollView: Moved away from boundary into content → canceling delegation (scroll_x={self.scroll_x:.3f})")
+                print(f"Inner ScrollView: Moved away from boundary into content → canceling lock (scroll_x={self.scroll_x:.3f})")
                 touch.ud['nsvm']['delegation_mode'] = 'unknown'
                 return False
             
             # At right boundary trying to scroll left (beyond)
             if touch.dx < 0 and self.scroll_x >= 0.95:
-                print(f"Inner ScrollView: At right boundary, scrolling beyond → locking (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
+                print(f"Inner ScrollView: At right boundary, scrolling beyond → locking inner (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
                 touch.ud['nsvm']['delegation_mode'] = 'locked'
                 return True
             # At left boundary trying to scroll right (beyond)
             elif touch.dx > 0 and self.scroll_x <= 0.05:
-                print(f"Inner ScrollView: At left boundary, scrolling beyond → locking (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
+                print(f"Inner ScrollView: At left boundary, scrolling beyond → locking inner (scroll_x={self.scroll_x:.3f}, dx={touch.dx:.1f})")
                 touch.ud['nsvm']['delegation_mode'] = 'locked'
                 return True
                 
         elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling
             # Check if we've moved away from the boundary into content
             if 0.05 < self.scroll_y < 0.95:
-                print(f"Inner ScrollView: Moved away from boundary into content → canceling delegation (scroll_y={self.scroll_y:.3f})")
+                print(f"Inner ScrollView: Moved away from boundary into content → canceling lock (scroll_y={self.scroll_y:.3f})")
                 touch.ud['nsvm']['delegation_mode'] = 'unknown'
                 return False
             
             # At bottom boundary trying to scroll up (beyond)
             if touch.dy < 0 and self.scroll_y >= 0.95:
-                print(f"Inner ScrollView: At bottom boundary, scrolling beyond → locking (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
+                print(f"Inner ScrollView: At bottom boundary, scrolling beyond → locking inner (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
                 touch.ud['nsvm']['delegation_mode'] = 'locked'
                 return True
             # At top boundary trying to scroll down (beyond)
             elif touch.dy > 0 and self.scroll_y <= 0.05:
-                print(f"Inner ScrollView: At top boundary, scrolling beyond → locking (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
+                print(f"Inner ScrollView: At top boundary, scrolling beyond → locking inner (scroll_y={self.scroll_y:.3f}, dy={touch.dy:.1f})")
                 touch.ud['nsvm']['delegation_mode'] = 'locked'
                 return True
         
@@ -1127,6 +1169,7 @@ class ScrollView(StencilView):
                 pass  # Effect was started but delegated before being used
 
     def on_scroll_start(self, touch, check_children=True):
+        print(f"on_scroll_start: called for ScrollView, mode={touch.ud.get('nsvm', {}).get('mode', 'no_nsvm')}, scroll_y={self.scroll_y:.3f}")
         if not self.collide_point(*touch.pos):
             touch.ud[self._get_uid('svavoid')] = True
             return False
@@ -1187,21 +1230,24 @@ class ScrollView(StencilView):
 
         # WEB-STYLE BOUNDARY DELEGATION:
         # Check if this touch is starting at a scroll boundary
-        # Only set delegation_mode if parallel_delegation is enabled and not in scrollbar
+        # Only check ONCE per gesture - for the first scrollview touched
+        # Subsequent scrollviews (e.g., outer receiving delegation) should skip this check
         if 'nsvm' in touch.ud and not in_bar:
+            # Only check if delegation_mode hasn't been set yet for this gesture
             manager = touch.ud['nsvm'].get('nested_managed')
             if manager and manager.parallel_delegation:
                 # Check if at boundary (tolerance 0.05)
                 at_boundary_x = (self.do_scroll_x and 
-                               (self.scroll_x <= 0.05 or self.scroll_x >= 0.95))
+                                (self.scroll_x <= 0.05 or self.scroll_x >= 0.95))
                 at_boundary_y = (self.do_scroll_y and 
-                               (self.scroll_y <= 0.05 or self.scroll_y >= 0.95))
-                
+                                (self.scroll_y <= 0.05 or self.scroll_y >= 0.95))
+                    
+                # Set delegation_mode based on boundary state
                 if at_boundary_x or at_boundary_y:
                     touch.ud['nsvm']['delegation_mode'] = 'start_at_boundary'
                     print(f"ScrollView: Touch started at boundary, delegation_mode='start_at_boundary' (scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f})")
                 else:
-                    touch.ud['nsvm']['delegation_mode'] = 'unknown'
+                    # Leave as 'unknown' - no delegation will occur
                     print(f"ScrollView: Touch started NOT at boundary, delegation_mode='unknown' (scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f})")
 
         if not in_bar:
@@ -1307,7 +1353,7 @@ class ScrollView(StencilView):
                 # PARALLEL BOUNDARY DELEGATION: delegate if at scroll boundary in parallel setup
                 # Only delegate when trying to scroll BEYOND the boundary (can't scroll further)
                 # Only applies to CONTENT scrolling, not scrollbar dragging
-                if self._is_at_boundary_for_delegation(touch):
+                if self._should_lock_at_boundary(touch):
                     print(f"Inner ScrollView: Boundary delegation - passing to outer ScrollView")
                     return False  # Let manager handle delegation to outer
 
@@ -1403,8 +1449,8 @@ class ScrollView(StencilView):
             # (e.g., no scroll bar interaction or dragging)
             if not ud['scroll_action']:
                 self.simulate_touch_down(touch)  # Let children handle the "click"
-                # Schedule delayed touch up to complete the click simulation
-                Clock.schedule_once(partial(self._do_touch_up, touch), .2)
+            # Schedule delayed touch up to complete the click simulation
+            Clock.schedule_once(partial(self._do_touch_up, touch), .2)
 
         # Update effect bounds after scroll completion
         ev = self._update_effect_bounds_ev
