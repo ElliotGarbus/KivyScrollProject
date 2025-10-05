@@ -1235,20 +1235,28 @@ class ScrollView(StencilView):
         if 'nsvm' in touch.ud and not in_bar:
             # Only check if delegation_mode hasn't been set yet for this gesture
             manager = touch.ud['nsvm'].get('nested_managed')
-            if manager and manager.parallel_delegation:
-                # Check if at boundary (tolerance 0.05)
-                at_boundary_x = (self.do_scroll_x and 
+            if manager and manager.parallel_delegation and manager.outer_scrollview:
+                outer = manager.outer_scrollview
+                
+                # PARALLEL DELEGATION: Only check boundaries in directions where BOTH
+                # inner and outer scroll. In orthogonal setups (inner scrolls Y, outer scrolls X),
+                # the inner should freely overscroll in Y direction without delegation.
+                
+                # Check X boundary only if both inner and outer scroll horizontally
+                at_boundary_x = (self.do_scroll_x and outer.do_scroll_x and 
                                 (self.scroll_x <= 0.05 or self.scroll_x >= 0.95))
-                at_boundary_y = (self.do_scroll_y and 
+                
+                # Check Y boundary only if both inner and outer scroll vertically  
+                at_boundary_y = (self.do_scroll_y and outer.do_scroll_y and 
                                 (self.scroll_y <= 0.05 or self.scroll_y >= 0.95))
                     
-                # Set delegation_mode based on boundary state
+                # Set delegation_mode based on boundary state in PARALLEL directions only
                 if at_boundary_x or at_boundary_y:
                     touch.ud['nsvm']['delegation_mode'] = 'start_at_boundary'
-                    print(f"ScrollView: Touch started at boundary, delegation_mode='start_at_boundary' (scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f})")
+                    print(f"ScrollView: Touch started at PARALLEL boundary, delegation_mode='start_at_boundary' (scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f})")
                 else:
                     # Leave as 'unknown' - no delegation will occur
-                    print(f"ScrollView: Touch started NOT at boundary, delegation_mode='unknown' (scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f})")
+                    print(f"ScrollView: Touch started NOT at parallel boundary, delegation_mode='unknown' (scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f})")
 
         if not in_bar:
             Clock.schedule_once(self._change_touch_mode,
