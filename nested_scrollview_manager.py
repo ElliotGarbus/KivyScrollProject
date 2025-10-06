@@ -36,7 +36,7 @@ Scrollbar scrolling behavior:
 #TODO: remove debug print statements.
 #TODO: clean up code/implementation comments.
 #TODO: Register the NestedScrollViewManager with kv.
-#TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx (search for use)
+#TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
 #TODO: formatting prior to PR
 
 from kivy.uix.relativelayout import RelativeLayout
@@ -76,20 +76,34 @@ class NestedScrollViewManager(RelativeLayout):
         self.inner_scrollview = None
     
     def _find_colliding_inner_scrollview(self, touch):
-        """Find the first ScrollView that collides with the touch position."""
+        """
+        Find the first ScrollView that collides with the touch position.
+        
+        Optimized to check direct children first and only walk subtrees
+        that collide with the touch point, avoiding unnecessary tree traversal.
+        """
         viewport = self.outer_scrollview._viewport
         # Transform touch to viewport space
         touch.push()
         touch.apply_transform_2d(viewport.to_widget)
         
-        # Walk all widgets to find ScrollViews
-        for widget in viewport.walk(restrict=True):
-            if isinstance(widget, ScrollView):
-                collides = widget.collide_point(*touch.pos)
-                if collides:
+        # Iterate direct children first (instead of walking entire tree immediately)
+        for child in viewport.children:
+            # Quick collision check before walking subtree
+            if not child.collide_point(*touch.pos):
+                continue  # Skip this entire branch - touch isn't in it
+            
+            # Is this child itself a ScrollView?
+            if isinstance(child, ScrollView):
+                touch.pop()
+                return child
+            
+            # Walk only this colliding child's subtree
+            for widget in child.walk(restrict=True):
+                if isinstance(widget, ScrollView) and widget.collide_point(*touch.pos):
                     touch.pop()
-                    print(f"Inner ScrollView found: {widget}")
                     return widget
+        
         touch.pop()
         return None
 
