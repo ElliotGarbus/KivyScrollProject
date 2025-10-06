@@ -123,10 +123,9 @@ class ScrollObserverApp(App):
         self.scroll_x_label.text = f'scroll_x: {self.scrollview.scroll_x:.4f}'
         self.scroll_y_label.text = f'scroll_y: {self.scrollview.scroll_y:.4f}'
     
-    def on_scroll_start_event(self, instance, touch):
+    def on_scroll_start_event(self, instance):
         """Handle on_scroll_start event for testing"""
-        print(f'[EVENT] on_scroll_start fired - scroll gesture detected')
-        print(f'[EVENT] Touch position: {touch.pos}')
+        print(f'[EVENT] on_scroll_start fired - scroll gesture detected {instance}')
         print(f'[EVENT] Scroll position: x={self.scrollview.scroll_x:.4f}, y={self.scrollview.scroll_y:.4f}')
         print('-' * 40)
     

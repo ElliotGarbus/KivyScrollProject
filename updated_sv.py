@@ -912,6 +912,9 @@ class ScrollView(StencilView):
         if not e:
             return False
             
+        # Dispatch on_scroll_start for mouse wheel scrolling
+        self.dispatch('on_scroll_start')
+        
         # Apply wheel scroll movement
         self._apply_wheel_scroll(e, btn, m)
         e.trigger_velocity_update()
@@ -1193,11 +1196,7 @@ class ScrollView(StencilView):
         if in_bar:
             self._handle_scrollbar_jump(touch, in_bar_x, in_bar_y)
             # Dispatch on_scroll_start for scrollbar interactions
-            # Ensure touch is in window coordinates for external handlers
-            touch.push()
-            touch.apply_transform_2d(self.to_window)
-            self.dispatch('on_scroll_start', touch)
-            touch.pop()
+            self.dispatch('on_scroll_start')
 
         # no mouse scrolling, the user is going to drag the scrollview with
         # this touch.
@@ -1315,12 +1314,9 @@ class ScrollView(StencilView):
             # This allows orthogonal delegation to work properly
             if (ud['dx'] > self.scroll_distance or ud['dy'] > self.scroll_distance):
                 ud['mode'] = 'scroll'
-                # Dispatch on_scroll_start when touch is promoted to scroll mode
-                # Ensure touch is in window coordinates for external handlers
-                touch.push()
-                touch.apply_transform_2d(self.to_window)
-                self.dispatch('on_scroll_start', touch)
-                touch.pop()
+                # Only dispatch on_scroll_start if we weren't already scrolling (e.g. from scrollbar)
+                if not ud['scroll_action']:
+                    self.dispatch('on_scroll_start')
 
         if ud['mode'] == 'scroll':
             # NESTED SCROLLVIEW DELEGATION CHECK:
@@ -1707,7 +1703,7 @@ class ScrollView(StencilView):
     # They can be overridden to implement velocity-based scroll detection,
     # custom scroll behavior, or integration with other systems.
     
-    def on_scroll_start(self, touch):
+    def on_scroll_start(self):
         """Called when scroll gesture is detected to start.
         
         This is the new public event for external binding. Override this
@@ -1719,7 +1715,7 @@ class ScrollView(StencilView):
         """
         pass
     
-    def on_scroll_move(self, touch):
+    def on_scroll_move(self):
         """Called during scroll movement.
         
         This is the new public event for external binding. Override this
@@ -1730,7 +1726,7 @@ class ScrollView(StencilView):
         """
         pass
     
-    def on_scroll_stop(self, touch):
+    def on_scroll_stop(self):
         """Called when scroll motion has stopped.
         
         This is the new public event for external binding. Override this
