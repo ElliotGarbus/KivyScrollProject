@@ -98,6 +98,7 @@ class ScrollObserverApp(App):
         
         # Bind to scroll events for testing
         self.scrollview.bind(on_scroll_start=self.on_scroll_start_event)
+        self.scrollview.bind(on_scroll_move=self.on_scroll_move_event)
         
         # Assemble the UI
         main_layout.add_widget(control_panel)
@@ -126,6 +127,12 @@ class ScrollObserverApp(App):
     def on_scroll_start_event(self, instance):
         """Handle on_scroll_start event for testing"""
         print(f'[EVENT] on_scroll_start fired - scroll gesture detected {instance}')
+        print(f'[EVENT] Scroll position: x={self.scrollview.scroll_x:.4f}, y={self.scrollview.scroll_y:.4f}')
+        print('-' * 40)
+
+    def on_scroll_move_event(self, instance):
+        """Handle on_scroll_move event for testing"""
+        print(f'[EVENT] on_scroll_move fired')
         print(f'[EVENT] Scroll position: x={self.scrollview.scroll_x:.4f}, y={self.scrollview.scroll_y:.4f}')
         print('-' * 40)
     

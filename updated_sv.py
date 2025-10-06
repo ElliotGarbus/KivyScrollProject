@@ -569,6 +569,10 @@ class ScrollView(StencilView):
         self.register_event_type('on_scroll_move')
         self.register_event_type('on_scroll_stop')
 
+        # Bind scroll position changes to dispatch on_scroll_move
+        self.fbind('scroll_x', self._on_scroll_pos_changed)
+        self.fbind('scroll_y', self._on_scroll_pos_changed)
+
         # now add the viewport canvas to our canvas
         self.canvas.add(self.canvas_viewport)
 
@@ -1613,6 +1617,11 @@ class ScrollView(StencilView):
         self.canvas = canvas
         if widget is self._viewport:
             self._viewport = None
+
+    def _on_scroll_pos_changed(self, instance, value):
+        """Called when scroll_x or scroll_y changes.
+        Dispatches on_scroll_move event to notify listeners of actual scroll position changes."""
+        self.dispatch('on_scroll_move')
 
     def _get_uid(self, prefix='sv'):
         # UNIQUE IDENTIFIER GENERATOR FOR TOUCH.UD KEYS
