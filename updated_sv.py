@@ -760,7 +760,7 @@ class ScrollView(StencilView):
         # handles touch routing and calls on_scroll_start directly.
         if not self.collide_point(*touch.pos):
             return False
-        if self.dispatch('on_scroll_start', touch):
+        if self._scroll_initialize(touch):
             touch.grab(self)
             return True
         return False
@@ -1174,8 +1174,8 @@ class ScrollView(StencilView):
         if self.do_scroll_y and self.effect_y and not_in_bar:
             self.effect_y.stop(touch.y)
 
-    def on_scroll_start(self, touch, check_children=True):
-        print(f"on_scroll_start: called for ScrollView, mode={touch.ud.get('nsvm', {}).get('mode', 'no_nsvm')}, scroll_y={self.scroll_y:.3f}")
+    def _scroll_initialize(self, touch, check_children=True):
+        print(f"_scroll_initialize: called for ScrollView, mode={touch.ud.get('nsvm', {}).get('mode', 'no_nsvm')}, scroll_y={self.scroll_y:.3f}")
         if not self.collide_point(*touch.pos):
             touch.ud[self._get_uid('svavoid')] = True
             return False
@@ -1303,14 +1303,14 @@ class ScrollView(StencilView):
         # touch.grab_current is current scrollview; primary touch, 
         # Initialize axis handling state and dispatch to scroll logic
         touch.ud['sv.handled'] = {'x': False, 'y': False}
-        print(f"on_touch_move: dispatching to on_scroll_move")
-        return self.dispatch('on_scroll_move', touch)
+        print(f"on_touch_move: calling _scroll_update")
+        return self._scroll_update(touch)
 
 
-    def on_scroll_move(self, touch):
-        print(f"on_scroll_move: touch.ud: {touch.ud}")
+    def _scroll_update(self, touch):
+        print(f"_scroll_update: touch.ud: {touch.ud}")
         if self._get_uid('svavoid') in touch.ud: 
-            print(f"on_scroll_move: svavoid in touch.ud")
+            print(f"_scroll_update: svavoid in touch.ud")
             return False
 
         rv = True
@@ -1321,9 +1321,9 @@ class ScrollView(StencilView):
         uid = self._get_uid()  
         # if not 'nsvm' in touch.ud:
         if uid not in touch.ud:
-            print(f"on_scroll_move: uid not in touch.ud")
+            print(f"_scroll_update: uid not in touch.ud")
             self._touch = False
-            return self.on_scroll_start(touch, False)
+            return self._scroll_initialize(touch, False)
         ud = touch.ud[uid]
 
         # check if the minimum distance has been travelled
@@ -1338,8 +1338,8 @@ class ScrollView(StencilView):
                 return False
             ud['dx'] += abs(touch.dx)
             ud['dy'] += abs(touch.dy)
-            print(f"on_scroll_move: ud['dx'] += abs(touch.dx): {ud['dx']}")
-            print(f"on_scroll_move: ud['dy'] += abs(touch.dy): {ud['dy']}")
+            print(f"_scroll_update: ud['dx'] += abs(touch.dx): {ud['dx']}")
+            print(f"_scroll_update: ud['dy'] += abs(touch.dy): {ud['dy']}")
             
 
             # Transition to scroll mode if movement exceeds threshold on any axis
@@ -1377,7 +1377,7 @@ class ScrollView(StencilView):
             ud['dt'] = touch.time_update - ud['time']
             ud['time'] = touch.time_update
             ud['user_stopped'] = True
-        print(f"on_scroll_move: rv: {rv}")
+        print(f"_scroll_update: rv: {rv}")
         return rv
 
 
@@ -1397,7 +1397,7 @@ class ScrollView(StencilView):
             # Deliver scroll stop event and clean up grab ownership
             # This is critical to prevent lingering grab ownership that can
             # interfere with subsequent touches in nested ScrollViews
-            self.dispatch('on_scroll_stop', touch)
+            self._scroll_finalize(touch)
             
             # Double-check grab ownership after on_scroll_stop handlers run
             # Some handlers might have already released the grab
@@ -1419,14 +1419,14 @@ class ScrollView(StencilView):
 
         # CASE 3: Normal scroll stop handling
         # This ScrollView is actively handling this touch
-        if self.dispatch('on_scroll_stop', touch):
+        if self._scroll_finalize(touch):
             touch.ungrab(self)
             if not touch.ud[uid_key].get('can_defocus', True):
                 # Touch caused scrolling - prevent focused widget defocus
                 FocusBehavior.ignored_touch.append(touch)
             return True
 
-    def on_scroll_stop(self, touch, check_children=True):
+    def _scroll_finalize(self, touch, check_children=True):
         # SCROLL COMPLETION AND FINAL CLEANUP
         # ====================================
         # This method handles the end of scroll gestures and performs final cleanup.
@@ -1731,6 +1731,47 @@ class ScrollView(StencilView):
             # touch is in window coords
             self._delegate_touch_up_to_children_widget_coords(touch)
         touch.grab_current = None
+
+    # NEW PUBLIC SCROLL EVENTS
+    # ========================
+    # These methods provide the new event system for external binding.
+    # They can be overridden to implement velocity-based scroll detection,
+    # custom scroll behavior, or integration with other systems.
+    
+    def on_scroll_start(self, touch):
+        """Called when scroll gesture is detected to start.
+        
+        This is the new public event for external binding. Override this
+        method to implement custom scroll start behavior based on velocity,
+        position, or other criteria.
+        
+        Args:
+            touch: The touch event that initiated the scroll
+        """
+        pass
+    
+    def on_scroll_move(self, touch):
+        """Called during scroll movement.
+        
+        This is the new public event for external binding. Override this
+        method to implement custom scroll movement behavior.
+        
+        Args:
+            touch: The touch event during scroll movement
+        """
+        pass
+    
+    def on_scroll_stop(self, touch):
+        """Called when scroll motion has stopped.
+        
+        This is the new public event for external binding. Override this
+        method to implement custom scroll stop behavior. This can be based
+        on velocity reaching zero, position changes, or other criteria.
+        
+        Args:
+            touch: The touch event when scroll stops
+        """
+        pass
 
 
 if __name__ == '__main__':
