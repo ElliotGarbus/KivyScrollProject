@@ -511,14 +511,17 @@ class ScrollView(StencilView):
     
     On very slow devices, at least 3 frames are needed to accumulate
     velocity data for scroll effects to work properly. When enabled,
-    the scroll timeout will wait for a minimum of 3 frames before
-    transitioning from scroll detection to widget interaction mode.
+    after the scroll timeout expires, the gesture handoff will be delayed
+    until at least 3 frames have rendered, ensuring sufficient velocity
+    data accumulation.
     
     This addresses issues #1464 and #1499 for low-performance devices.
     Disable this on modern hardware to improve touch responsiveness.
 
     :attr:`slow_device_support` is a :class:`~kivy.properties.BooleanProperty`
     and defaults to False.
+
+    .. versionadded:: 3.0.0
     '''
 
     # Class constants for mouse wheel scroll button sets
