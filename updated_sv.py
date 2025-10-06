@@ -1215,6 +1215,12 @@ class ScrollView(StencilView):
         
         if in_bar:
             self._handle_scrollbar_jump(touch, in_bar_x, in_bar_y)
+            # Dispatch on_scroll_start for scrollbar interactions
+            # Ensure touch is in window coordinates for external handlers
+            touch.push()
+            touch.apply_transform_2d(self.to_window)
+            self.dispatch('on_scroll_start', touch)
+            touch.pop()
 
         # no mouse scrolling, the user is going to drag the scrollview with
         # this touch.
@@ -1346,6 +1352,12 @@ class ScrollView(StencilView):
             # This allows orthogonal delegation to work properly
             if (ud['dx'] > self.scroll_distance or ud['dy'] > self.scroll_distance):
                 ud['mode'] = 'scroll'
+                # Dispatch on_scroll_start when touch is promoted to scroll mode
+                # Ensure touch is in window coordinates for external handlers
+                touch.push()
+                touch.apply_transform_2d(self.to_window)
+                self.dispatch('on_scroll_start', touch)
+                touch.pop()
 
         if ud['mode'] == 'scroll':
             print(f"SCROLL MODE ACTIVE: ScrollView {self} processing touch in scroll mode")

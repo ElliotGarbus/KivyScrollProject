@@ -324,6 +324,14 @@ class NestedScrollViewManager(RelativeLayout):
                     # Switch mode to 'outer' - inner is now locked, all scrolling goes to outer
                     touch.ud['nsvm']['mode'] = 'outer'
                     print(f"   Switched mode to 'outer' (inner locked, outer scrolling)")
+                    
+                    # Dispatch on_scroll_start for outer scrollview (delegation)
+                    # Ensure touch is in window coordinates for external handlers
+                    touch.push()
+                    touch.apply_transform_2d(self.outer_scrollview.to_window)
+                    self.outer_scrollview.dispatch('on_scroll_start', touch)
+                    touch.pop()
+                    print(f"   Dispatched on_scroll_start for outer ScrollView (delegation)")
 
                     # Clear inner scrollview's _touch since it's no longer actively scrolling
                     if self.inner_scrollview:

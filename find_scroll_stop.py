@@ -13,7 +13,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.spinner import Spinner
 from kivy.uix.button import Button
-from kivy.uix.scrollview import ScrollView
+from updated_sv import ScrollView
 
 
 class ScrollObserverApp(App):
@@ -96,6 +96,9 @@ class ScrollObserverApp(App):
         # Bind to effect velocity changes (more efficient than polling)
         self.bind_velocity_updates()
         
+        # Bind to scroll events for testing
+        self.scrollview.bind(on_scroll_start=self.on_scroll_start_event)
+        
         # Assemble the UI
         main_layout.add_widget(control_panel)
         main_layout.add_widget(info_panel)
@@ -119,6 +122,13 @@ class ScrollObserverApp(App):
         # Update scroll position labels
         self.scroll_x_label.text = f'scroll_x: {self.scrollview.scroll_x:.4f}'
         self.scroll_y_label.text = f'scroll_y: {self.scrollview.scroll_y:.4f}'
+    
+    def on_scroll_start_event(self, instance, touch):
+        """Handle on_scroll_start event for testing"""
+        print(f'[EVENT] on_scroll_start fired - scroll gesture detected')
+        print(f'[EVENT] Touch position: {touch.pos}')
+        print(f'[EVENT] Scroll position: x={self.scrollview.scroll_x:.4f}, y={self.scrollview.scroll_y:.4f}')
+        print('-' * 40)
     
     def update_velocity_values(self, instance, value):
         # Update velocity labels from the scroll effects (triggered by velocity property change)
@@ -145,8 +155,8 @@ class ScrollObserverApp(App):
             self.was_scrolling = True
             self.motion_status_label.text = '[b]Status:[/b] [color=00ff00]Scrolling[/color]'
             # Print to console when velocity is non-zero (for debugging)
-            print(f'Scrolling - X: {self.scrollview.scroll_x:.4f}, Y: {self.scrollview.scroll_y:.4f}, '
-                  f'VelX: {vel_x:.2f}, VelY: {vel_y:.2f}')
+            # print(f'Scrolling - X: {self.scrollview.scroll_x:.4f}, Y: {self.scrollview.scroll_y:.4f}, '
+            #       f'VelX: {vel_x:.2f}, VelY: {vel_y:.2f}')
         elif self.was_scrolling:
             # Velocity just reached zero - motion has stopped!
             self.was_scrolling = False
