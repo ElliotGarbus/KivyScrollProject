@@ -506,6 +506,21 @@ class ScrollView(StencilView):
     and defaults to None.
     '''
 
+    slow_device_support = BooleanProperty(False)
+    '''Enable slow device support for scroll gesture detection.
+    
+    On very slow devices, at least 3 frames are needed to accumulate
+    velocity data for scroll effects to work properly. When enabled,
+    the scroll timeout will wait for a minimum of 3 frames before
+    transitioning from scroll detection to widget interaction mode.
+    
+    This addresses issues #1464 and #1499 for low-performance devices.
+    Disable this on modern hardware to improve touch responsiveness.
+
+    :attr:`slow_device_support` is a :class:`~kivy.properties.BooleanProperty`
+    and defaults to False.
+    '''
+
     # Class constants for mouse wheel scroll button sets
     _MOUSE_WHEEL_HORIZONTAL = {'scrollleft', 'scrollright'}
     _MOUSE_WHEEL_VERTICAL = {'scrolldown', 'scrollup'}
@@ -1665,15 +1680,15 @@ class ScrollView(StencilView):
         if ud['mode'] != 'unknown' or ud['scroll_action']:
             return
             
-        diff_frames = Clock.frames - ud['frames']
-
         # SLOW DEVICE PROTECTION:
         # On very slow devices, we need at least 3 frames to accumulate
         # velocity data. Otherwise, scroll effects might not work properly.
         # This addresses issues #1464 and #1499 for low-performance devices.
-        if diff_frames < 3:
-            Clock.schedule_once(self._change_touch_mode, 0)
-            return
+        if self.slow_device_support:
+            diff_frames = Clock.frames - ud['frames']
+            if diff_frames < 3:
+                Clock.schedule_once(self._change_touch_mode, 0)
+                return
 
         # CLEANUP AND HANDOFF:
         # Cancel any scroll effects that may have started
