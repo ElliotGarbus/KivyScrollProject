@@ -73,6 +73,7 @@ class NestedScrollViewManager(RelativeLayout):
         super().__init__(**kwargs)
         self.outer_scrollview = None
         self.inner_scrollview = None
+        self._current_touch = None
 
     def _find_colliding_inner_scrollview(self, touch):
         """
@@ -125,6 +126,10 @@ class NestedScrollViewManager(RelativeLayout):
 
         if not self.children:
             return False
+        
+        # Enforce single-touch policy
+        if self._current_touch is not None:
+            return False
 
         outer_scrollview = self.outer_scrollview = self.children[0]
         inner_scrollview = self.inner_scrollview = self._find_colliding_inner_scrollview(touch)
@@ -167,6 +172,7 @@ class NestedScrollViewManager(RelativeLayout):
                             touch.pop()
                             touch.grab(self)
                             touch.ud['nsvm']['mode'] = 'inner'
+                            self._current_touch = touch
                             return True
                     else:
                         touch.pop()
@@ -176,6 +182,7 @@ class NestedScrollViewManager(RelativeLayout):
                             touch.pop()
                             touch.grab(self)
                             touch.ud['nsvm']['mode'] = 'outer'
+                            self._current_touch = touch
                             return True
                     touch.pop()
                     return False
@@ -185,6 +192,7 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.pop()
                 touch.grab(self)
                 touch.ud['nsvm']['mode'] = 'outer'
+                self._current_touch = touch
                 return True
 
         # NORMAL TOUCH HANDLING:
@@ -194,6 +202,7 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.pop()
                 touch.grab(self)
                 touch.ud['nsvm']['mode'] = 'outer'
+                self._current_touch = touch
                 return True
 
         # First check if touch is on inner scrollview
@@ -205,6 +214,7 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.pop()
                 touch.grab(self)  # Manager maintains grab ownership
                 touch.ud['nsvm']['mode'] = 'inner'
+                self._current_touch = touch
                 return True
 
         # If not handled by inner (or no inner), try outer scrollview
@@ -216,6 +226,7 @@ class NestedScrollViewManager(RelativeLayout):
             touch.pop()
             touch.grab(self)
             touch.ud['nsvm']['mode'] = 'outer'
+            self._current_touch = touch
             return True
 
         touch.pop()
@@ -355,6 +366,10 @@ class NestedScrollViewManager(RelativeLayout):
         # First, handle touches that this manager is actively managing
         if touch.ud.get('nsvm', False) and touch.grab_current is self:
             touch.ungrab(self)
+            
+            # Clear the current touch tracking
+            if self._current_touch is touch:
+                self._current_touch = None
 
             mode = touch.ud['nsvm'].get('mode')
 
