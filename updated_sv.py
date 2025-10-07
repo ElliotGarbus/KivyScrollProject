@@ -1165,6 +1165,10 @@ class ScrollView(StencilView):
             self.effect_y.stop(touch.y)
 
     def _scroll_initialize(self, touch):
+        # this is the first phase of the scroll gesture, call from on_touch_down
+        # it is used to determine if the scrollview should handle the touch
+        # and to initialize the scroll effects
+        
         if not self.collide_point(*touch.pos):
             touch.ud[self._get_uid('svavoid')] = True
             return False
@@ -1295,6 +1299,8 @@ class ScrollView(StencilView):
 
 
     def _scroll_update(self, touch):
+        # this is the second phase of the scroll gesture, called from on_touch_move
+        # it is used to update the scroll effects
         if self._get_uid('svavoid') in touch.ud:
             return False
 
@@ -1406,14 +1412,8 @@ class ScrollView(StencilView):
             return True
 
     def _scroll_finalize(self, touch):
-        # SCROLL COMPLETION AND FINAL CLEANUP
-        # ====================================
+        # SCROLL COMPLETION AND FINAL CLEANUP, called from on_touch_up
         # This method handles the end of scroll gestures and performs final cleanup.
-        # It handles multiple scenarios:
-        # 1. Child widget scroll stop (nested ScrollViews)
-        # 2. Effect stopping and cleanup
-        # 3. Click passthrough for unrecognized gestures
-        # 4. Mouse wheel event acknowledgment
         
         self._touch = None  # Clear our active touch reference
 
