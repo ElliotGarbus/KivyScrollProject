@@ -1164,7 +1164,7 @@ class ScrollView(StencilView):
         if self.do_scroll_y and self.effect_y and not_in_bar:
             self.effect_y.stop(touch.y)
 
-    def _scroll_initialize(self, touch, check_children=True):
+    def _scroll_initialize(self, touch):
         if not self.collide_point(*touch.pos):
             touch.ud[self._get_uid('svavoid')] = True
             return False
