@@ -704,18 +704,27 @@ class ScrollView(StencilView):
         # ==============================================
         # This method safely re-dispatches touch events to child widgets, typically
         # used when a touch gesture is determined to be a click rather than a scroll.
+        #
+        # Returns:
+        #     bool: True if a child widget grabbed the touch, False otherwise.
+        #           This indicates whether the touch was accepted by a child widget
+        #           (e.g., a button, text input, etc.).
         touch.push()
         touch.apply_transform_2d(self.to_local)
         
         # Store original grab state to restore later if needed
         original_grab_current = getattr(touch, 'grab_current', None)
+        original_grab_count = len(touch.grab_list) if touch.grab_list else 0
         
         # Only ungrab nested manager if we're currently grabbed by it
         # This prevents interfering with the manager's touch_up handling
         if 'nsvm' in touch.ud and touch.grab_current == touch.ud['nsvm']['nested_managed']:
-            touch.ungrab(touch.ud['nsvm']['nested_managed'])  
+            touch.ungrab(touch.ud['nsvm']['nested_managed'])
+            original_grab_count -= 1
             
         ret = super(ScrollView, self).on_touch_down(touch)
+        new_grab_count = len(touch.grab_list) if touch.grab_list else 0
+        child_grabbed = new_grab_count > original_grab_count
         
         # If we ungrabbed the manager and no child grabbed the touch, restore the grab
         # This ensures the manager can still handle touch_up properly
@@ -725,7 +734,7 @@ class ScrollView(StencilView):
             touch.grab(touch.ud['nsvm']['nested_managed'])
             
         touch.pop()
-        return ret
+        return child_grabbed
 
     def on_motion(self, etype, me):
         if me.type_id in self.motion_filter and 'pos' in me.profile:
@@ -1753,7 +1762,7 @@ class ScrollView(StencilView):
             self.effect_x.cancel()
         if self.do_scroll_y and self.effect_y:
             self.effect_y.cancel()
-            
+        
         touch.ungrab(self)
         self._touch = None
         
@@ -1766,7 +1775,15 @@ class ScrollView(StencilView):
         touch.apply_transform_2d(self.to_widget)
         touch.apply_transform_2d(self.to_parent)
         
-        self.simulate_touch_down(touch)
+        child_grabbed = self.simulate_touch_down(touch)
+        
+        # Only clear ScrollView's state if a child widget grabbed the touch
+        # If no child grabbed it, keep the sv. keys so scrolling can resume
+        if child_grabbed:
+            uid = self._get_uid()
+            if uid in touch.ud:
+                del touch.ud[uid]
+        
         touch.pop()
         return
 
