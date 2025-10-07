@@ -194,15 +194,10 @@ class ScrollObserverApp(App):
             # Scroll is in motion
             self.was_scrolling = True
             self.motion_status_label.text = '[b]Status:[/b] [color=00ff00]Scrolling[/color]'
-            # Print to console when velocity is non-zero (for debugging)
-            # print(f'Scrolling - X: {self.scrollview.scroll_x:.4f}, Y: {self.scrollview.scroll_y:.4f}, '
-            #       f'VelX: {vel_x:.2f}, VelY: {vel_y:.2f}')
         elif self.was_scrolling:
             # Velocity just reached zero - motion has stopped!
             self.was_scrolling = False
             self.motion_status_label.text = '[b]Status:[/b] [color=ff0000]Stopped[/color]'
-            print(f'>>> SCROLL MOTION STOPPED <<< Final Position - X: {self.scrollview.scroll_x:.4f}, Y: {self.scrollview.scroll_y:.4f}')
-            print('-' * 60)
 
 
 if __name__ == '__main__':

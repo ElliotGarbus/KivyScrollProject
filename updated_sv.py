@@ -553,6 +553,11 @@ class ScrollView(StencilView):
         self._touch = None
         self._trigger_update_from_scroll = Clock.create_trigger(
             self.update_from_scroll, -1)
+        # For velocity-based stop detection
+        self._velocity_check_ev = None
+        self._position_check_ev = None
+        self._last_scroll_pos = None
+        self._stable_frames = 0
         # create a specific canvas for the viewport
         from kivy.graphics import PushMatrix, Translate, PopMatrix, Canvas
         self.canvas_viewport = Canvas()
@@ -1191,6 +1196,11 @@ class ScrollView(StencilView):
         if 'button' in touch.profile and touch.button.startswith('scroll'):
             if self._handle_mouse_wheel_scroll(touch, touch.button, in_bar_x, in_bar_y):
                 touch.ud[self._get_uid('svavoid')] = True
+                # Start velocity check for scroll stop after mouse wheel
+                if self._velocity_check_ev:
+                    self._velocity_check_ev.cancel()
+                self._velocity_check_ev = Clock.schedule_interval(
+                    self._check_velocity_for_stop, 1/60.0)
                 return True
             return False
         
@@ -1395,7 +1405,7 @@ class ScrollView(StencilView):
                 FocusBehavior.ignored_touch.append(touch)
             return True
 
-    def _scroll_finalize(self, touch, check_children=True):
+    def _scroll_finalize(self, touch):
         # SCROLL COMPLETION AND FINAL CLEANUP
         # ====================================
         # This method handles the end of scroll gestures and performs final cleanup.
@@ -1422,6 +1432,13 @@ class ScrollView(StencilView):
             
         # Stop scroll effects if they were active (not for bar interactions)
         self._stop_scroll_effects(touch, not_in_bar)
+        
+        # Start checking for velocity-based stop if this was a scroll
+        if ud['mode'] == 'scroll' or ud['scroll_action']:
+            if self._velocity_check_ev:
+                self._velocity_check_ev.cancel()
+            self._velocity_check_ev = Clock.schedule_interval(
+                self._check_velocity_for_stop, 1/60.0)
             
         # CLICK PASSTHROUGH LOGIC
         # If the gesture never transitioned from 'unknown' to 'scroll' mode,
@@ -1622,6 +1639,66 @@ class ScrollView(StencilView):
         """Called when scroll_x or scroll_y changes.
         Dispatches on_scroll_move event to notify listeners of actual scroll position changes."""
         self.dispatch('on_scroll_move')
+
+    def _check_position_stable(self, dt):
+        """Check if scroll position has stabilized."""
+        current_pos = (self.scroll_x, self.scroll_y)
+        
+        if self._last_scroll_pos is None:
+            self._last_scroll_pos = current_pos
+            self._stable_frames = 0
+            return True
+            
+        # Check if position changed
+        threshold = 0.0001
+        pos_changed = (abs(current_pos[0] - self._last_scroll_pos[0]) > threshold or
+                      abs(current_pos[1] - self._last_scroll_pos[1]) > threshold)
+        
+        if not pos_changed:
+            # Position hasn't changed - increment stable counter
+            self._stable_frames += 1
+            
+            # Require 3 consecutive stable frames before dispatching stop
+            if self._stable_frames >= 3:
+                self.dispatch('on_scroll_stop')
+                # Clean up
+                if self._position_check_ev:
+                    self._position_check_ev.cancel()
+                self._position_check_ev = None
+                self._last_scroll_pos = None
+                self._stable_frames = 0
+                return False
+        else:
+            # Position still changing - reset counter
+            self._last_scroll_pos = current_pos
+            self._stable_frames = 0
+            
+        return True
+
+    def _check_velocity_for_stop(self, dt):
+        """Check if velocity has been zero for enough frames to consider scroll stopped."""
+        # Get current velocities
+        vel_x = self.effect_x.velocity if self.effect_x else 0
+        vel_y = self.effect_y.velocity if self.effect_y else 0
+        
+        # Use small threshold for velocity check
+        threshold = 0.0001
+        if abs(vel_x) < threshold and abs(vel_y) < threshold:
+            # Velocity is zero - now check position stability
+            if self._velocity_check_ev:
+                self._velocity_check_ev.cancel()
+            self._velocity_check_ev = None
+            
+            # Start position stability check
+            self._last_scroll_pos = None
+            self._stable_frames = 0
+            if self._position_check_ev:
+                self._position_check_ev.cancel()
+            self._position_check_ev = Clock.schedule_interval(
+                self._check_position_stable, 0)
+            return False
+            
+        return True
 
     def _get_uid(self, prefix='sv'):
         # UNIQUE IDENTIFIER GENERATOR FOR TOUCH.UD KEYS
