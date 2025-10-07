@@ -28,6 +28,7 @@ Scrollbar scrolling behavior:
 - For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
 """
 
+# TODO: Test scroll events with nested scrollviews.
 # TODO: Evaluate integration of the Manager in the ScrollView.
 # TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
 # TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
