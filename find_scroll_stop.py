@@ -27,7 +27,8 @@ class ScrollObserverApp(App):
         # Control panel at the top
         control_panel = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=10)
         
-        # Spinner for scroll effect selection
+        # Left side - Effect selection
+        effect_controls = BoxLayout(orientation='horizontal', size_hint_x=0.7, spacing=10)
         effect_label = Label(text='Scroll Effect:', size_hint_x=0.3)
         self.effect_spinner = Spinner(
             text='DampedScrollEffect',
@@ -35,9 +36,20 @@ class ScrollObserverApp(App):
             size_hint_x=0.7
         )
         self.effect_spinner.bind(text=self.on_effect_change)
+        effect_controls.add_widget(effect_label)
+        effect_controls.add_widget(self.effect_spinner)
         
-        control_panel.add_widget(effect_label)
-        control_panel.add_widget(self.effect_spinner)
+        # Right side - Smooth scroll toggle
+        smooth_controls = BoxLayout(orientation='horizontal', size_hint_x=0.3, spacing=5)
+        self.smooth_toggle = Button(
+            text='Smooth: On',
+            size_hint_x=1
+        )
+        self.smooth_toggle.bind(on_press=self.toggle_smooth_scroll)
+        smooth_controls.add_widget(self.smooth_toggle)
+        
+        control_panel.add_widget(effect_controls)
+        control_panel.add_widget(smooth_controls)
         
         # Info display panel
         info_panel = BoxLayout(orientation='horizontal', size_hint_y=None, height=150, spacing=5)
@@ -70,7 +82,8 @@ class ScrollObserverApp(App):
             do_scroll_x=True,
             do_scroll_y=True,
             bar_width=10,
-            scroll_type=['bars', 'content']
+            scroll_type=['bars', 'content'],
+            smooth_scroll_end=10  # Start with smooth scrolling on
         )
         
         # Create scrollable content - a grid of buttons
@@ -99,6 +112,7 @@ class ScrollObserverApp(App):
         # Bind to scroll events for testing
         self.scrollview.bind(on_scroll_start=self.on_scroll_start_event)
         self.scrollview.bind(on_scroll_move=self.on_scroll_move_event)
+        self.scrollview.bind(on_scroll_stop=self.on_scroll_stop_event)
         
         # Assemble the UI
         main_layout.add_widget(control_panel)
@@ -134,6 +148,26 @@ class ScrollObserverApp(App):
         """Handle on_scroll_move event for testing"""
         print(f'[EVENT] on_scroll_move fired')
         print(f'[EVENT] Scroll position: x={self.scrollview.scroll_x:.4f}, y={self.scrollview.scroll_y:.4f}')
+        print('-' * 40)
+
+    def toggle_smooth_scroll(self, instance):
+        """Toggle smooth scroll between on (10) and off (None)"""
+        if self.scrollview.smooth_scroll_end is None:
+            self.scrollview.smooth_scroll_end = 10
+            self.smooth_toggle.text = 'Smooth: On'
+        else:
+            self.scrollview.smooth_scroll_end = None
+            self.smooth_toggle.text = 'Smooth: Off'
+        print(f'[CONFIG] Smooth scroll end set to: {self.scrollview.smooth_scroll_end}')
+        print('-' * 40)
+
+    def on_scroll_stop_event(self, instance):
+        """Handle on_scroll_stop event for testing"""
+        vel_x = self.scrollview.effect_x.velocity if self.scrollview.effect_x else 0
+        vel_y = self.scrollview.effect_y.velocity if self.scrollview.effect_y else 0
+        print(f'[EVENT] on_scroll_stop fired')
+        print(f'[EVENT] Final position: x={self.scrollview.scroll_x:.4f}, y={self.scrollview.scroll_y:.4f}')
+        print(f'[EVENT] Final velocity: x={vel_x:.6f}, y={vel_y:.6f}')
         print('-' * 40)
     
     def update_velocity_values(self, instance, value):
