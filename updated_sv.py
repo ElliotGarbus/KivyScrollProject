@@ -1176,10 +1176,13 @@ class ScrollView(StencilView):
         if self.disabled:
             return True
         
-        if self._touch or (not (self.do_scroll_x or self.do_scroll_y)):
-            # When already handling a touch or scrolling is disabled for both
-            # axes, re-dispatch the event to our child content so non-scroll
-            # interactions (e.g., buttons) still work.
+        if self._touch:
+            # Already handling a touch - reject this one to enforce single-touch policy
+            return False
+        
+        if not (self.do_scroll_x or self.do_scroll_y):
+            # Scrolling is disabled for both axes
+            # Re-dispatch to child content so non-scroll interactions (e.g., buttons) still work
             return self.simulate_touch_down(touch)
 
         # handle mouse scrolling, only if the viewport size is bigger than the
