@@ -1313,7 +1313,7 @@ class ScrollView(StencilView):
         # if not 'nsvm' in touch.ud:
         if uid not in touch.ud:
             self._touch = False
-            return self._scroll_initialize(touch, False)
+            return self._scroll_initialize(touch)
         ud = touch.ud[uid]
 
         # check if the minimum distance has been travelled
