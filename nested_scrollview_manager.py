@@ -319,9 +319,12 @@ class NestedScrollViewManager(RelativeLayout):
                     # Dispatch on_scroll_start for outer scrollview (delegation)
                     self.outer_scrollview.dispatch('on_scroll_start')
 
-                    # Clear inner scrollview's _touch since it's no longer actively scrolling
+                    # Clear inner scrollview's _touch and stop its scroll effects
+                    # This ensures overscroll state is cleaned up when delegating
                     if self.inner_scrollview:
                         self.inner_scrollview._touch = None
+                        # Stop inner scrollview's scroll effects to reset overscroll
+                        self.inner_scrollview._stop_scroll_effects(touch, not_in_bar=True)
 
                 # Reset sv.handled flags for delegation
                 touch.ud['sv.handled'] = {'x': False, 'y': False}
