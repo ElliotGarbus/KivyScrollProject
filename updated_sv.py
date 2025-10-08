@@ -1803,45 +1803,69 @@ class ScrollView(StencilView):
             self._delegate_touch_up_to_children_widget_coords(touch)
         touch.grab_current = None
 
-    # NEW PUBLIC SCROLL EVENTS
-    # ========================
-    # These methods provide the new event system for external binding.
-    # They can be overridden to implement velocity-based scroll detection,
-    # custom scroll behavior, or integration with other systems.
     
     def on_scroll_start(self):
-        """Called when scroll gesture is detected to start.
+        '''Event fired when a scroll gesture starts.
         
-        This is the new public event for external binding. Override this
-        method to implement custom scroll start behavior based on velocity,
-        position, or other criteria.
+        This event is dispatched when scrolling begins, regardless of the input
+        method (touch, mouse wheel, or programmatic). It fires once per scroll
+        gesture when the ScrollView determines that scrolling should commence.
         
-        Args:
-            touch: The touch event that initiated the scroll
-        """
+        For touch/content scrolling, this fires after the touch has moved beyond
+        the scroll_distance threshold. For scrollbar interactions, it fires when
+        the scrollbar is initially grabbed. For mouse wheel scrolling, it fires
+        on the first scroll wheel event.
+        
+        .. versionchanged:: NEXT_VERSION
+            Removed touch parameter. Use on_touch_down/move/up for touch-specific
+            handling.
+        '''
         pass
     
     def on_scroll_move(self):
-        """Called during scroll movement.
+        '''Event fired when the scroll position changes.
         
-        This is the new public event for external binding. Override this
-        method to implement custom scroll movement behavior.
+        This event is dispatched whenever the scroll_x or scroll_y properties
+        change during an active scroll gesture. It provides a unified way to
+        track scrolling regardless of input method (touch, mouse wheel, scrollbar,
+        or programmatic scroll_x/scroll_y changes).
         
-        Args:
-            touch: The touch event during scroll movement
-        """
+        This event fires continuously during scrolling and is useful for
+        implementing scroll-based animations, progress indicators, or parallax
+        effects.
+        
+        .. versionchanged:: NEXT_VERSION
+            Removed touch parameter. Use on_touch_down/move/up for touch-specific
+            handling. Now fires for all scroll_x/scroll_y changes including
+            programmatic updates.
+        '''
         pass
     
     def on_scroll_stop(self):
-        """Called when scroll motion has stopped.
+        '''Event fired when scrolling motion stops.
         
-        This is the new public event for external binding. Override this
-        method to implement custom scroll stop behavior. This can be based
-        on velocity reaching zero, position changes, or other criteria.
+        This event is dispatched when the scrolling motion has completely stopped.
+        The detection method depends on whether scroll effects are active:
         
-        Args:
-            touch: The touch event when scroll stops
-        """
+        - **With scroll effects** (DampedScrollEffect, etc.): Fires when both
+          velocity reaches zero and scroll position stabilizes for 3 consecutive
+          frames. This hybrid detection ensures the event fires after all
+          momentum/damping has finished.
+          
+        - **Without scroll effects**: Fires on touch up (on_touch_up event).
+        
+        - **Mouse wheel scrolling**: Fires when velocity reaches zero after
+          the smooth_scroll_end animation completes (if enabled).
+        
+        This event is useful for triggering actions after scrolling completes,
+        such as loading more content, snapping to grid positions, or updating
+        UI state.
+        
+        .. versionchanged:: NEXT_VERSION
+            Removed touch parameter. Use on_touch_down/move/up for touch-specific
+            handling. Improved detection to use hybrid velocity/position checking
+            for more reliable stop detection across all scroll effects.
+        '''
         pass
 
 
