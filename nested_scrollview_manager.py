@@ -120,16 +120,23 @@ class NestedScrollViewManager(RelativeLayout):
         Returns:
             bool: True if the touch is handled by this manager
         """
+        print(f"[MANAGER on_touch_down] Touch received - profile: {touch.profile}, pos: {touch.pos}")
+        
         # Only handle touches that collide with this manager
         if not self.collide_point(*touch.pos):
+            print(f"[MANAGER on_touch_down] No collision")
             return False
 
         if not self.children:
+            print(f"[MANAGER on_touch_down] No children")
             return False
         
         # Enforce single-touch policy
         if self._current_touch is not None:
+            print(f"[MANAGER on_touch_down] Already handling a touch")
             return False
+        
+        print(f"[MANAGER on_touch_down] Accepting touch")
 
         outer_scrollview = self.outer_scrollview = self.children[0]
         inner_scrollview = self.inner_scrollview = self._find_colliding_inner_scrollview(touch)
@@ -244,8 +251,33 @@ class NestedScrollViewManager(RelativeLayout):
         """
         if touch.grab_current is not self:
             return True
+        
         inner_scrollview = self.inner_scrollview
         outer_scrollview = self.outer_scrollview
+        
+        # Check for claimed_by_child flag from either inner or outer scrollview
+        inner_uid = inner_scrollview._get_uid('claimed_by_child') if inner_scrollview else None
+        outer_uid = outer_scrollview._get_uid('claimed_by_child') if outer_scrollview else None
+        
+        if (inner_uid and inner_uid in touch.ud) or (outer_uid and outer_uid in touch.ud):
+            print(f"[MANAGER on_touch_move] Touch claimed by child - delegating to children")
+            # Delegate to children so button can handle the move
+            # Transform touch to appropriate coordinate space first
+            mode = touch.ud['nsvm']['mode']
+            if mode == 'outer':
+                touch.push()
+                touch.apply_transform_2d(outer_scrollview.parent.to_widget)
+                result = outer_scrollview._delegate_to_children(touch, 'on_touch_move')
+                touch.pop()
+                return result
+            elif mode == 'inner':
+                touch.push()
+                touch.apply_transform_2d(inner_scrollview.parent.to_widget)
+                result = inner_scrollview._delegate_to_children(touch, 'on_touch_move')
+                touch.pop()
+                return result
+            return True
+        
         mode = touch.ud['nsvm']['mode']
 
         # GESTURE WIDGET COORDINATION CHECK
@@ -263,10 +295,19 @@ class NestedScrollViewManager(RelativeLayout):
         if not any(isinstance(key, str) and key.startswith('sv.')
                    for key in touch.ud):
             # Handle dragged widgets - pass to children to prevent crashes
+            # Transform touch to appropriate coordinate space first
             if mode == 'outer':
-                return outer_scrollview._delegate_to_children(touch, 'on_touch_move')
+                touch.push()
+                touch.apply_transform_2d(outer_scrollview.parent.to_widget)
+                result = outer_scrollview._delegate_to_children(touch, 'on_touch_move')
+                touch.pop()
+                return result
             elif mode == 'inner':
-                return inner_scrollview._delegate_to_children(touch, 'on_touch_move')
+                touch.push()
+                touch.apply_transform_2d(inner_scrollview.parent.to_widget)
+                result = inner_scrollview._delegate_to_children(touch, 'on_touch_move')
+                touch.pop()
+                return result
             else:
                 raise ValueError(f"Invalid mode: {mode}")
 
@@ -324,7 +365,10 @@ class NestedScrollViewManager(RelativeLayout):
                     if self.inner_scrollview:
                         self.inner_scrollview._touch = None
                         # Stop inner scrollview's scroll effects to reset overscroll
+                        touch.push()
+                        touch.apply_transform_2d(self.inner_scrollview.parent.to_widget)
                         self.inner_scrollview._stop_scroll_effects(touch, not_in_bar=True)
+                        touch.pop()
 
                 # Reset sv.handled flags for delegation
                 touch.ud['sv.handled'] = {'x': False, 'y': False}
@@ -332,7 +376,7 @@ class NestedScrollViewManager(RelativeLayout):
                 # Temporarily transfer grab ownership for outer ScrollView delegation
                 touch.ungrab(self)
                 touch.grab(self.outer_scrollview)
-
+                
                 outer_result = self.outer_scrollview._scroll_update(touch)
 
                 # Restore grab ownership to manager
