@@ -706,44 +706,30 @@ class ScrollView(StencilView):
         # used when a touch gesture is determined to be a click rather than a scroll.
         #
         # Returns:
-        #     bool: True if a child widget grabbed the touch, False otherwise.
+        #     bool: True if a child widget handled/consumed the touch, False otherwise.
         #           This indicates whether the touch was accepted by a child widget
         #           (e.g., a button, text input, etc.).
-        print(f"[simulate_touch_down] Called - touch profile: {touch.profile}")
-        print(f"[simulate_touch_down] Touch pos: {touch.pos}")
-        print(f"[simulate_touch_down] Grab list before: {[type(w()).__name__ if hasattr(w, '__call__') else type(w).__name__ for w in touch.grab_list]}")
-        
         touch.push()
         touch.apply_transform_2d(self.to_local)
-        
         # Store original grab state to restore later if needed
         original_grab_current = getattr(touch, 'grab_current', None)
-        original_grab_count = len(touch.grab_list) if touch.grab_list else 0
         
         # Only ungrab nested manager if we're currently grabbed by it
         # This prevents interfering with the manager's touch_up handling
         if 'nsvm' in touch.ud and touch.grab_current == touch.ud['nsvm']['nested_managed']:
-            print(f"[simulate_touch_down] Ungrabbing manager temporarily")
             touch.ungrab(touch.ud['nsvm']['nested_managed'])
-            original_grab_count -= 1
             
         ret = super(ScrollView, self).on_touch_down(touch)
-        new_grab_count = len(touch.grab_list) if touch.grab_list else 0
-        child_grabbed = new_grab_count > original_grab_count
-        
-        print(f"[simulate_touch_down] super returned: {ret}, child_grabbed: {child_grabbed}, grabs: {original_grab_count} -> {new_grab_count}")
-        print(f"[simulate_touch_down] Grab list after: {[type(w()).__name__ if hasattr(w, '__call__') else type(w).__name__ for w in touch.grab_list]}")
         
         # If we ungrabbed the manager and no child grabbed the touch, restore the grab
         # This ensures the manager can still handle touch_up properly
         if ('nsvm' in touch.ud and 
             original_grab_current == touch.ud['nsvm']['nested_managed'] and 
             touch.grab_current is None):
-            print(f"[simulate_touch_down] Restoring manager grab")
             touch.grab(touch.ud['nsvm']['nested_managed'])
             
         touch.pop()
-        return child_grabbed
+        return ret
 
     def on_motion(self, etype, me):
         if me.type_id in self.motion_filter and 'pos' in me.profile:
