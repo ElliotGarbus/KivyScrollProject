@@ -75,6 +75,43 @@ class NestedScrollViewManager(RelativeLayout):
         self.outer_scrollview = None
         self.inner_scrollview = None
         self._current_touch = None
+    
+    def _with_transform(self, touch, scrollview, callback):
+        """
+        Execute a callback with touch transformed to scrollview's coordinate space.
+        
+        Args:
+            touch: The touch event to transform
+            scrollview: The ScrollView whose coordinate space to transform to
+            callback: Function to call with transformed touch
+            
+        Returns:
+            The result of the callback
+        """
+        touch.push()
+        touch.apply_transform_2d(scrollview.parent.to_widget)
+        try:
+            result = callback(touch)
+        finally:
+            touch.pop()
+        return result
+    
+    def _delegate_to_scrollview_children(self, touch, scrollview, method_name='on_touch_move'):
+        """
+        Delegate touch event to ScrollView's children in correct coordinate space.
+        
+        Args:
+            touch: The touch event
+            scrollview: The ScrollView whose children to delegate to
+            method_name: The method name to call (default: 'on_touch_move')
+            
+        Returns:
+            Result from _delegate_to_children
+        """
+        return self._with_transform(
+            touch, scrollview,
+            lambda t: scrollview._delegate_to_children(t, method_name)
+        )
 
     def _find_colliding_inner_scrollview(self, touch):
         """
@@ -263,21 +300,9 @@ class NestedScrollViewManager(RelativeLayout):
         if (inner_uid and inner_uid in touch.ud) or (outer_uid and outer_uid in touch.ud):
             print(f"[MANAGER on_touch_move] Touch claimed by child - delegating to children")
             # Delegate to children so button can handle the move
-            # Transform touch to appropriate coordinate space first
             mode = touch.ud['nsvm']['mode']
-            if mode == 'outer':
-                touch.push()
-                touch.apply_transform_2d(outer_scrollview.parent.to_widget)
-                result = outer_scrollview._delegate_to_children(touch, 'on_touch_move')
-                touch.pop()
-                return result
-            elif mode == 'inner':
-                touch.push()
-                touch.apply_transform_2d(inner_scrollview.parent.to_widget)
-                result = inner_scrollview._delegate_to_children(touch, 'on_touch_move')
-                touch.pop()
-                return result
-            return True
+            scrollview = outer_scrollview if mode == 'outer' else inner_scrollview
+            return self._delegate_to_scrollview_children(touch, scrollview)
         
         mode = touch.ud['nsvm']['mode']
 
@@ -296,19 +321,10 @@ class NestedScrollViewManager(RelativeLayout):
         if not any(isinstance(key, str) and key.startswith('sv.')
                    for key in touch.ud):
             # Handle dragged widgets - pass to children to prevent crashes
-            # Transform touch to appropriate coordinate space first
             if mode == 'outer':
-                touch.push()
-                touch.apply_transform_2d(outer_scrollview.parent.to_widget)
-                result = outer_scrollview._delegate_to_children(touch, 'on_touch_move')
-                touch.pop()
-                return result
+                return self._delegate_to_scrollview_children(touch, outer_scrollview)
             elif mode == 'inner':
-                touch.push()
-                touch.apply_transform_2d(inner_scrollview.parent.to_widget)
-                result = inner_scrollview._delegate_to_children(touch, 'on_touch_move')
-                touch.pop()
-                return result
+                return self._delegate_to_scrollview_children(touch, inner_scrollview)
             else:
                 raise ValueError(f"Invalid mode: {mode}")
 
@@ -318,11 +334,11 @@ class NestedScrollViewManager(RelativeLayout):
         # double-processing and coordinate multi-axis scrolling
 
         if mode == 'inner':
-            # Transform touch to inner ScrollView's parent's coordinate space
-            touch.push()
-            touch.apply_transform_2d(self.inner_scrollview.parent.to_widget)
-            result = self.inner_scrollview._scroll_update(touch)
-            touch.pop()
+            # Call inner ScrollView's scroll update in its coordinate space
+            result = self._with_transform(
+                touch, self.inner_scrollview,
+                lambda t: self.inner_scrollview._scroll_update(t)
+            )
 
             # If inner ScrollView rejected the touch (orthogonal movement), delegate to outer
             if not result:
@@ -392,12 +408,11 @@ class NestedScrollViewManager(RelativeLayout):
             return result
 
         elif mode == 'outer':
-            # Transform touch to outer ScrollView's parent's coordinate space
-            touch.push()
-            touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
-            result = self.outer_scrollview._scroll_update(touch)
-            touch.pop()
-            return result
+            # Call outer ScrollView's scroll update in its coordinate space
+            return self._with_transform(
+                touch, self.outer_scrollview,
+                lambda t: self.outer_scrollview._scroll_update(t)
+            )
 
         return False
 
