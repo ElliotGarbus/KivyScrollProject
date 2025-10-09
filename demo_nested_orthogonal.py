@@ -27,7 +27,8 @@ class NestedScrollViewDemo(App):
             do_scroll_y=True,
             scroll_type=['bars', 'content'],
             bar_width=dp(8),
-            bar_color=[0.3, 0.6, 1.0, 0.8]
+            bar_color=[0.3, 0.6, 1.0, 0.8],
+            smooth_scroll_end=10
         )
         left_container = BoxLayout(
             orientation='vertical',
@@ -43,7 +44,8 @@ class NestedScrollViewDemo(App):
                 size_hint_y=None,
                 height=dp(120),
                 bar_width=dp(6),
-                bar_color=[1.0, 0.5, 0.3, 0.8]
+                bar_color=[1.0, 0.5, 0.3, 0.8],
+                smooth_scroll_end=10
             )
             horizontal_content = BoxLayout(
                 orientation='horizontal',
@@ -78,7 +80,8 @@ class NestedScrollViewDemo(App):
             do_scroll_y=False,
             scroll_type=['bars', 'content'],
             bar_width=dp(8),
-            bar_color=[0.3, 1.0, 0.6, 0.8]
+            bar_color=[0.3, 1.0, 0.6, 0.8],
+            smooth_scroll_end=10
         )
         right_container = BoxLayout(
             orientation='horizontal',
@@ -94,7 +97,8 @@ class NestedScrollViewDemo(App):
                 size_hint_x=None,
                 width=dp(200),
                 bar_width=dp(6),
-                bar_color=[1.0, 0.3, 0.5, 0.8]
+                bar_color=[1.0, 0.3, 0.5, 0.8],
+                smooth_scroll_end=10
             )
             vertical_content = GridLayout(
                 cols=1,
