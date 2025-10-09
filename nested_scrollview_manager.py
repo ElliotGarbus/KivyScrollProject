@@ -461,18 +461,21 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.pop()
             else:
                 raise ValueError(f"Invalid mode: {mode}")
-                # Still delegate to children even if mode is invalid
-                return super(NestedScrollViewManager, self).on_touch_up(touch)
+            
+            # Delete uid from touch.ud to prevent double-processing
+            # We've already called _scroll_finalize above, so scrollview's on_touch_up shouldn't process it again
+            if mode == 'inner' and self.inner_scrollview:
+                uid = self.inner_scrollview._get_uid()
+                if uid in touch.ud:
+                    del touch.ud[uid]
+            elif mode == 'outer' and self.outer_scrollview:
+                uid = self.outer_scrollview._get_uid()
+                if uid in touch.ud:
+                    del touch.ud[uid]
 
-            # After cleaning up scroll state, always delegate to children
-            # This ensures buttons/widgets get their on_touch_up even if gesture became a scroll
-            # Critical for preventing stuck button states
-            return super(NestedScrollViewManager, self).on_touch_up(touch)
-
-        # For touches not managed by this manager, delegate to children
-        # This is critical for button/widget interactions that aren't scroll gestures
-        # Always delegate to children - this ensures buttons get their touch_up events
-        # The manager only handles scroll cleanup above, everything else goes to children
+        # Always delegate to children after cleanup
+        # This ensures buttons/widgets get their on_touch_up even if gesture became a scroll
+        # Critical for preventing stuck button states and for touches not managed by this manager
         return super(NestedScrollViewManager, self).on_touch_up(touch)
 
 
