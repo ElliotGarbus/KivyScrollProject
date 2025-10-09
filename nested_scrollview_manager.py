@@ -158,23 +158,16 @@ class NestedScrollViewManager(RelativeLayout):
         Returns:
             bool: True if the touch is handled by this manager
         """
-        print(f"[MANAGER on_touch_down] Touch received - profile: {touch.profile}, pos: {touch.pos}")
-        
         # Only handle touches that collide with this manager
         if not self.collide_point(*touch.pos):
-            print(f"[MANAGER on_touch_down] No collision")
             return False
 
         if not self.children:
-            print(f"[MANAGER on_touch_down] No children")
             return False
         
         # Enforce single-touch policy
         if self._current_touch is not None:
-            print(f"[MANAGER on_touch_down] Already handling a touch")
             return False
-        
-        print(f"[MANAGER on_touch_down] Accepting touch")
 
         outer_scrollview = self.outer_scrollview = self.children[0]
         inner_scrollview = self.inner_scrollview = self._find_colliding_inner_scrollview(touch)
@@ -298,7 +291,6 @@ class NestedScrollViewManager(RelativeLayout):
         outer_uid = outer_scrollview._get_uid('claimed_by_child') if outer_scrollview else None
         
         if (inner_uid and inner_uid in touch.ud) or (outer_uid and outer_uid in touch.ud):
-            print(f"[MANAGER on_touch_move] Touch claimed by child - delegating to children")
             # Delegate to children so button can handle the move
             mode = touch.ud['nsvm']['mode']
             scrollview = outer_scrollview if mode == 'outer' else inner_scrollview

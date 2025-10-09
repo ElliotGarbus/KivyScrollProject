@@ -771,17 +771,11 @@ class ScrollView(StencilView):
         # This method is only used when ScrollView operates standalone (not under
         # NestedScrollViewManager). For nested scenarios, NestedScrollViewManager
         # handles touch routing and calls on_scroll_start directly.
-        #
-        # DEBUG PRINTS ACTIVE - tracking touchscreen button press + scroll issue
-        print(f"[on_touch_down] Touch received - profile: {touch.profile}, pos: {touch.pos}")
         if not self.collide_point(*touch.pos):
-            print(f"[on_touch_down] No collision")
             return False
         if self._scroll_initialize(touch):
-            print(f"[on_touch_down] _scroll_initialize returned True - grabbing")
             touch.grab(self)
             return True
-        print(f"[on_touch_down] _scroll_initialize returned False")
         return False
 
     def _touch_in_handle(self, pos, size, touch):
@@ -1182,7 +1176,6 @@ class ScrollView(StencilView):
         # Check if this touch was claimed by a child widget (e.g., button)
         # If so, don't initialize scrolling
         if self._get_uid('claimed_by_child') in touch.ud:
-            print(f"[_scroll_initialize] Touch claimed by child - rejecting")
             return False
         
         if not self.collide_point(*touch.pos):
@@ -1208,7 +1201,6 @@ class ScrollView(StencilView):
             return True
         scroll_type = self.scroll_type
         ud = touch.ud
-        # scroll_bar = 'bars' in scroll_type
 
         # Check if touch is in scroll bars and set in_bar flags
         in_bar_x, in_bar_y = self._check_scroll_bounds(touch)
@@ -1285,20 +1277,13 @@ class ScrollView(StencilView):
         return True
 
     def on_touch_move(self, touch):
-        print(f"[on_touch_move] Touch move - profile: {touch.profile}, pos: {touch.pos}, dx/dy: {touch.dx}/{touch.dy}")
-        print(f"[on_touch_move] self._touch is touch: {self._touch is touch}")
-        print(f"[on_touch_move] touch.grab_current: {type(touch.grab_current).__name__ if touch.grab_current else None}")
-        
         # SINGLE-TOUCH POLICY: Only process our designated touch
         if self._touch is not touch:
-            print(f"[on_touch_move] Not our touch - delegating to children")
             return self._delegate_to_children(touch, 'on_touch_move')
         
         # Ensure we have grab ownership before processing
         if touch.grab_current is not self:
-            print(f"[on_touch_move] Not grab_current - returning True")
             return True
-        
         
         # GESTURE WIDGET COORDINATION CHECK
         # =================================
@@ -1310,12 +1295,9 @@ class ScrollView(StencilView):
         # If NO 'sv.' keys exist, neither scrolling nor dragging is active,
         # so this touch should be passed to child widgets (buttons, etc.)
         # to prevent crashes and ensure proper widget interaction.
-        sv_keys = [key for key in touch.ud if isinstance(key, str) and key.startswith('sv.')]
-        print(f"[on_touch_move] sv. keys in touch.ud: {sv_keys}")
-        
-        if not sv_keys:
+        if not any(isinstance(key, str) and key.startswith('sv.')
+                   for key in touch.ud):
             # Handle dragged widgets - pass to children to prevent crashes
-            print(f"[on_touch_move] No sv. keys - delegating to children")
             return self._delegate_to_children(touch, 'on_touch_move')
         
         # DIRECT SCROLL DISPATCH: 
@@ -1334,7 +1316,6 @@ class ScrollView(StencilView):
         # Check if this touch was claimed by a child widget (e.g., button)
         # If so, don't process it for scrolling
         if self._get_uid('claimed_by_child') in touch.ud:
-            print(f"[_scroll_update] Touch claimed by child - ignoring")
             return False
 
         rv = True
@@ -1345,16 +1326,12 @@ class ScrollView(StencilView):
         uid = self._get_uid()  
         # if not 'nsvm' in touch.ud:
         if uid not in touch.ud:
-            print(f"[_scroll_update] No uid in touch.ud - attempting re-initialize")
             self._touch = False
             return self._scroll_initialize(touch)
         ud = touch.ud[uid]
 
         # check if the minimum distance has been travelled
         if ud['mode'] == 'unknown':
-            print(f"[_scroll_update] Mode unknown - accumulated dx/dy: {ud['dx']}/{ud['dy']}, threshold: {self.scroll_distance}")
-            print(f"[_scroll_update] Touch dx/dy this move: {touch.dx}/{touch.dy}")
-            
             if not (self.do_scroll_x or self.do_scroll_y):
                 # touch is in parent, but _change expects window coords
                 touch.push()
@@ -1365,20 +1342,16 @@ class ScrollView(StencilView):
                 return False
             ud['dx'] += abs(touch.dx)
             ud['dy'] += abs(touch.dy)
-            
-            print(f"[_scroll_update] After accumulation - dx/dy: {ud['dx']}/{ud['dy']}")
 
             # Transition to scroll mode if movement exceeds threshold on any axis
             # This allows orthogonal delegation to work properly
             if (ud['dx'] > self.scroll_distance or ud['dy'] > self.scroll_distance):
-                print(f"[_scroll_update] THRESHOLD EXCEEDED - entering scroll mode")
                 ud['mode'] = 'scroll'
                 # Only dispatch on_scroll_start if we weren't already scrolling (e.g. from scrollbar)
                 if not ud['scroll_action']:
                     self.dispatch('on_scroll_start')
 
         if ud['mode'] == 'scroll':
-            print(f"[_scroll_update] In scroll mode - processing scroll")
             # NESTED SCROLLVIEW DELEGATION CHECK:
             # Only inner ScrollViews should delegate to outer ScrollViews
             # Outer ScrollViews (mode='outer') should not delegate further
@@ -1761,27 +1734,17 @@ class ScrollView(StencilView):
         # traveling the minimum scroll_distance. It transitions from scroll detection
         # mode to normal widget interaction mode by handing off the touch to child widgets.
         if not self._touch:
-            print("[_change_touch_mode] No self._touch, returning")
             return
             
         uid = self._get_uid()
         touch = self._touch
-        print(f"[_change_touch_mode] Called - touch profile: {touch.profile}")
-        print(f"[_change_touch_mode] Grab list: {[type(w()).__name__ if hasattr(w, '__call__') else type(w).__name__ for w in touch.grab_list]}")
-        print(f"[_change_touch_mode] Grab current: {type(touch.grab_current).__name__ if touch.grab_current else None}")
-        
         if uid not in touch.ud:
-            print("[_change_touch_mode] No uid in touch.ud, returning")
             self._touch = False
             return
             
         ud = touch.ud[uid]
-        print(f"[_change_touch_mode] Current mode: {ud.get('mode')}, scroll_action: {ud.get('scroll_action')}")
-        print(f"[_change_touch_mode] Accumulated dx/dy: {ud.get('dx')}/{ud.get('dy')}")
-        
         # Only proceed if we're still in gesture detection mode
         if ud['mode'] != 'unknown' or ud['scroll_action']:
-            print(f"[_change_touch_mode] Not in unknown mode or is scroll_action, returning")
             return
             
         # SLOW DEVICE PROTECTION:
@@ -1815,20 +1778,14 @@ class ScrollView(StencilView):
         
         child_grabbed = self.simulate_touch_down(touch)
         
-        print(f"[_change_touch_mode] child_grabbed: {child_grabbed}")
-        print(f"[_change_touch_mode] Grab list after simulate: {[type(w()).__name__ if hasattr(w, '__call__') else type(w).__name__ for w in touch.grab_list]}")
-        
         # Only clear ScrollView's state if a child widget grabbed the touch
         # If no child grabbed it, keep the sv. keys so scrolling can resume
         if child_grabbed:
-            print(f"[_change_touch_mode] Child grabbed - clearing sv. keys and setting claimed flag")
             uid = self._get_uid()
             if uid in touch.ud:
                 del touch.ud[uid]
             # Set flag to prevent re-initialization - this touch now belongs to child
             touch.ud[self._get_uid('claimed_by_child')] = True
-        else:
-            print(f"[_change_touch_mode] No child grabbed - keeping sv. keys")
         
         touch.pop()
         return
