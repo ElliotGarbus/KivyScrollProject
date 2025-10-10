@@ -28,6 +28,9 @@ Demonstrations/tests using the updated scrollview and the NestedScrollManager:
 - demo_nested_xy_mixed.py - Demo showing XY outer with single-axis inner ScrollViews
 - demo_nested_single_xy.py - Demo showing single-axis outer with XY inner ScrollViews
 
+- demo_nested_slider.py - slider in an nested scrollview
+- demo_single_slider.py - slider in a non-nested scrollview
+
 - demo_single_horizontal - non-nested horizontal scrollview
 - demo_single_vertical - non-nested vertical scrollview
 - demo_single_xy - non-nested XY scrollview
@@ -37,7 +40,7 @@ Demonstrations/tests using the updated scrollview and the NestedScrollManager:
 
 Other Files:
 - og_nested_verticals.py - demonstrates the kivy v2.31 nesting.  Only parallel nesting is supported, has artifacts.
-- my_scrollview.py - attempt to support nesting with minor modificaitons to the original ScrollView. (Abandond)
+- my_scrollview.py - attempt to support nesting with minor modificaitons to the original ScrollView. (Abandoned)
 
 
  The NestedScrollViewManger is not registered.  Register if you want to use with kv.

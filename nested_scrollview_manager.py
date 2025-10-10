@@ -28,14 +28,17 @@ Scrollbar scrolling behavior:
 - For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
 """
 
-# TODO: Test scroll views with sliders
-# TODO: create feature, dwelling on a non-button widget can be turned into a scroll.
-# TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
+
+
 # TODO: test interation with draggable widgets.
 # TODO: clean up code/implementation comments.
+# TODO: Create documentation for the NestedScrollViewManager.
+# TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
 # TODO: Register the NestedScrollViewManager with kv.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
 # TODO: formatting prior to PR
+
+# Requested Feature: dwelling on a non-button widget can be turned into a scroll.
 
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior
