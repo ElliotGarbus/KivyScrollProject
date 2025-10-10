@@ -1050,27 +1050,18 @@ class ScrollView(StencilView):
         abs_dx = abs(touch.dx)
         abs_dy = abs(touch.dy)
         
-        # DEBUG: Print configuration
-        print(f"[ORTHOGONAL CHECK] Inner: do_scroll_x={self.do_scroll_x}, do_scroll_y={self.do_scroll_y}")
-        print(f"[ORTHOGONAL CHECK] Outer: do_scroll_x={outer.do_scroll_x}, do_scroll_y={outer.do_scroll_y}")
-        print(f"[ORTHOGONAL CHECK] Movement: dx={touch.dx:.2f}, dy={touch.dy:.2f}, abs_dx={abs_dx:.2f}, abs_dy={abs_dy:.2f}")
-        print(f"[ORTHOGONAL CHECK] Inner position: scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}")
-        
         # Only delegate if:
         # 1. Movement is SIGNIFICANTLY orthogonal (2x threshold to avoid noise)
         # 2. AND outer scrollview CAN scroll in that direction
         
         # Horizontal movement that inner can't handle, but outer can
         if abs_dx > abs_dy * 2 and not self.do_scroll_x and outer.do_scroll_x:
-            print(f"[ORTHOGONAL CHECK] DELEGATING: Horizontal movement, inner can't scroll X")
             return True
         
         # Vertical movement that inner can't handle, but outer can
         if abs_dy > abs_dx * 2 and not self.do_scroll_y and outer.do_scroll_y:
-            print(f"[ORTHOGONAL CHECK] DELEGATING: Vertical movement, inner can't scroll Y")
             return True
         
-        print(f"[ORTHOGONAL CHECK] NOT DELEGATING: Inner handles this direction")
         return False
 
     def _should_delegate_mixed(self, touch):
@@ -1106,18 +1097,14 @@ class ScrollView(StencilView):
         
         # Check outer-exclusive axes (immediate delegation)
         if is_horizontal_dominant and 'x' in config['outer_exclusive']:
-            print(f"[MIXED] Outer-exclusive X axis, delegating")
             return True
         if is_vertical_dominant and 'y' in config['outer_exclusive']:
-            print(f"[MIXED] Outer-exclusive Y axis, delegating")
             return True
         
         # Check inner-exclusive axes (no delegation, inner continues)
         if is_horizontal_dominant and 'x' in config['inner_exclusive']:
-            print(f"[MIXED] Inner-exclusive X axis, no delegation")
             return False
         if is_vertical_dominant and 'y' in config['inner_exclusive']:
-            print(f"[MIXED] Inner-exclusive Y axis, no delegation")
             return False
         
         # Shared axes: fall through to _should_lock_at_boundary() 
@@ -1147,11 +1134,9 @@ class ScrollView(StencilView):
             return False
         
         delegation_mode = touch.ud.get('nsvm', {}).get('delegation_mode', 'unknown')
-        print(f"[LOCK CHECK] delegation_mode={delegation_mode}, scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}, dx={touch.dx:.2f}, dy={touch.dy:.2f}")
         
         # If not in delegation mode, never lock
         if delegation_mode == 'unknown':
-            print(f"[LOCK CHECK] Mode is 'unknown' - NOT LOCKING")
             return False
         
         # If already locked, keep it locked (inner doesn't scroll, stays locked for this gesture)
@@ -1339,13 +1324,9 @@ class ScrollView(StencilView):
                 at_boundary_y = (self.do_scroll_y and outer.do_scroll_y and 
                                 (self.scroll_y <= 0.05 or self.scroll_y >= 0.95))
                     
-                print(f"[INIT BOUNDARY] scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}")
-                print(f"[INIT BOUNDARY] at_boundary_x={at_boundary_x}, at_boundary_y={at_boundary_y}")
-                    
                 # Set delegation_mode based on boundary state in PARALLEL directions only
                 if at_boundary_x or at_boundary_y:
                     touch.ud['nsvm']['delegation_mode'] = 'start_at_boundary'
-                    print(f"[INIT BOUNDARY] Setting delegation_mode = 'start_at_boundary'")
 
         if not in_bar:
             Clock.schedule_once(self._change_touch_mode,

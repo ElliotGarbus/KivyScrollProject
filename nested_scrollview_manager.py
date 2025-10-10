@@ -224,7 +224,6 @@ class NestedScrollViewManager(RelativeLayout):
                     'outer_exclusive': outer_exclusive,
                     'inner_exclusive': inner_exclusive
                 }
-                print(f"[MIXED] Axis config: shared={shared}, outer_exclusive={outer_exclusive}, inner_exclusive={inner_exclusive}")
 
         touch.push()
         touch.apply_transform_2d(outer_scrollview.parent.to_widget)
@@ -234,8 +233,6 @@ class NestedScrollViewManager(RelativeLayout):
 
         # MOUSE WHEEL SPECIAL HANDLING:
         if wheel_scroll:
-            print(f"[WHEEL] Button: {touch.button}")
-            
             if inner_scrollview:
                 outer_axes = (outer_scrollview.do_scroll_x, outer_scrollview.do_scroll_y)
                 inner_axes = (inner_scrollview.do_scroll_x, inner_scrollview.do_scroll_y)
@@ -244,9 +241,6 @@ class NestedScrollViewManager(RelativeLayout):
                 # Determine scroll direction from button
                 is_horizontal_wheel = touch.button in ('scrollleft', 'scrollright')
                 is_vertical_wheel = touch.button in ('scrollup', 'scrolldown')
-                
-                print(f"[WHEEL] Outer axes: {outer_axes}, Inner axes: {inner_axes}, Parallel: {are_parallel}")
-                print(f"[WHEEL] Horizontal wheel: {is_horizontal_wheel}, Vertical wheel: {is_vertical_wheel}")
                 
                 # Mixed case logic:
                 # - Shared axis → parallel rules (collision-based)
@@ -259,7 +253,6 @@ class NestedScrollViewManager(RelativeLayout):
                 if are_parallel:
                     # Pure parallel case: use collision-based routing for all wheel directions
                     use_parallel_rules = True
-                    print(f"[WHEEL] Pure parallel case, using collision-based routing")
                 else:
                     # Mixed case: determine routing based on wheel direction and axis capabilities
                     outer_x, outer_y = outer_axes
@@ -270,30 +263,24 @@ class NestedScrollViewManager(RelativeLayout):
                         if outer_x and inner_x:
                             # Both can scroll X → parallel rules
                             use_parallel_rules = True
-                            print(f"[WHEEL] Horizontal wheel, both scroll X → parallel rules")
                         elif outer_x and not inner_x:
                             # Only outer scrolls X → always outer
                             target_scrollview = outer_scrollview
-                            print(f"[WHEEL] Horizontal wheel, only outer scrolls X → outer")
                         elif not outer_x and inner_x:
                             # Only inner scrolls X → always inner
                             target_scrollview = inner_scrollview
-                            print(f"[WHEEL] Horizontal wheel, only inner scrolls X → inner")
                     
                     elif is_vertical_wheel:
                         # Vertical wheel scrolling
                         if outer_y and inner_y:
                             # Both can scroll Y → parallel rules
                             use_parallel_rules = True
-                            print(f"[WHEEL] Vertical wheel, both scroll Y → parallel rules")
                         elif outer_y and not inner_y:
                             # Only outer scrolls Y → always outer
                             target_scrollview = outer_scrollview
-                            print(f"[WHEEL] Vertical wheel, only outer scrolls Y → outer")
                         elif not outer_y and inner_y:
                             # Only inner scrolls Y → always inner
                             target_scrollview = inner_scrollview
-                            print(f"[WHEEL] Vertical wheel, only inner scrolls Y → inner")
                 
                 # Apply routing decision
                 if use_parallel_rules:
@@ -302,28 +289,22 @@ class NestedScrollViewManager(RelativeLayout):
                     touch.push()
                     touch.apply_transform_2d(inner_scrollview.parent.to_widget)
                     if inner_scrollview.collide_point(*touch.pos):
-                        print(f"[WHEEL] Mouse over inner scrollview (parallel rules)")
                         if inner_scrollview._scroll_initialize(touch):
-                            print(f"[WHEEL] Inner accepted wheel scroll")
                             touch.pop()
                             touch.grab(self)
                             touch.ud['nsvm']['mode'] = 'inner'
                             self._current_touch = touch
                             return True
-                        print(f"[WHEEL] Inner rejected wheel scroll")
                     else:
-                        print(f"[WHEEL] Mouse over outer scrollview (parallel rules)")
                         touch.pop()
                         touch.push()
                         touch.apply_transform_2d(outer_scrollview.parent.to_widget)
                         if outer_scrollview._scroll_initialize(touch):
-                            print(f"[WHEEL] Outer accepted wheel scroll")
                             touch.pop()
                             touch.grab(self)
                             touch.ud['nsvm']['mode'] = 'outer'
                             self._current_touch = touch
                             return True
-                        print(f"[WHEEL] Outer rejected wheel scroll")
                     touch.pop()
                     return False
                 
@@ -334,26 +315,21 @@ class NestedScrollViewManager(RelativeLayout):
                     touch.apply_transform_2d(target_scrollview.parent.to_widget)
                     if target_scrollview._scroll_initialize(touch):
                         mode = 'inner' if target_scrollview == inner_scrollview else 'outer'
-                        print(f"[WHEEL] {mode.capitalize()} accepted wheel scroll (direct routing)")
                         touch.pop()
                         touch.grab(self)
                         touch.ud['nsvm']['mode'] = mode
                         self._current_touch = touch
                         return True
-                    print(f"[WHEEL] Target scrollview rejected wheel scroll")
                     touch.pop()
                     return False
 
             # For orthogonal scrollviews or no inner scrollview, outer scrollview handles the wheel
-            print(f"[WHEEL] No inner or orthogonal case, routing to outer")
             if outer_scrollview._scroll_initialize(touch):
-                print(f"[WHEEL] Outer accepted wheel scroll")
                 touch.pop()
                 touch.grab(self)
                 touch.ud['nsvm']['mode'] = 'outer'
                 self._current_touch = touch
                 return True
-            print(f"[WHEEL] Outer rejected wheel scroll")
 
         # NORMAL TOUCH HANDLING:
         # If touch is on outer scrollbar, handle it directly (don't check inner)
@@ -456,10 +432,6 @@ class NestedScrollViewManager(RelativeLayout):
 
             # If inner ScrollView rejected the touch (orthogonal movement), delegate to outer
             if not result:
-                print(f"[BOUNDARY] Inner._scroll_update returned False - checking for delegation")
-                print(f"[BOUNDARY] Inner scroll position: scroll_x={self.inner_scrollview.scroll_x:.3f}, scroll_y={self.inner_scrollview.scroll_y:.3f}")
-                print(f"[BOUNDARY] Touch movement: dx={touch.dx:.2f}, dy={touch.dy:.2f}")
-                
                 # Transform touch to outer ScrollView's parent's coordinate space
                 touch.push()
                 touch.apply_transform_2d(self.outer_scrollview.parent.to_widget)
@@ -467,7 +439,6 @@ class NestedScrollViewManager(RelativeLayout):
                 # Ensure outer ScrollView effects are initialized for scrolling
                 outer_uid = self.outer_scrollview._get_uid()
                 if outer_uid not in touch.ud:
-                    print(f"[BOUNDARY] DELEGATING to outer scrollview")
                     # CRITICAL: Create touch.ud[uid] entry for outer scrollview
                     # Without this, on_scroll_move will call on_scroll_start (see line 1317-1320 in updated_sv.py)
                     # which disrupts the touch flow and causes stuck buttons
@@ -520,7 +491,6 @@ class NestedScrollViewManager(RelativeLayout):
 
                 # CRITICAL: Always return True for delegated touches to prevent button presses
                 # Even if outer ScrollView returns False, we've handled the delegation
-                print(f"[BOUNDARY] Delegation complete, outer result: {outer_result}")
                 return True
 
             return result
