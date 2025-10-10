@@ -146,6 +146,7 @@ All the effects are located in the :mod:`kivy.effects`.
 __all__ = ('ScrollView', )
 
 from functools import partial
+from math import isclose
 from kivy.animation import Animation
 from kivy.config import Config
 from kivy.clock import Clock
@@ -1727,10 +1728,8 @@ class ScrollView(StencilView):
             return True
             
         # Check if position changed
-        threshold = 0.00001
-        pos_changed = (abs(current_pos[0] - self._last_scroll_pos[0]) > threshold or
-                      abs(current_pos[1] - self._last_scroll_pos[1]) > threshold)
-        
+        pos_changed = not (isclose(current_pos[0], self._last_scroll_pos[0]) and 
+                      isclose(current_pos[1], self._last_scroll_pos[1]))
         if not pos_changed:
             # Position hasn't changed - increment stable counter
             self._stable_frames += 1
@@ -1759,8 +1758,7 @@ class ScrollView(StencilView):
         vel_y = self.effect_y.velocity if self.effect_y else 0
         
         # Use small threshold for velocity check
-        threshold = 0.0001
-        if abs(vel_x) < threshold and abs(vel_y) < threshold:
+        if isclose(vel_x, 0.0) and isclose(vel_y, 0.0):
             # Velocity is zero - now check position stability
             if self._velocity_check_ev:
                 self._velocity_check_ev.cancel()
