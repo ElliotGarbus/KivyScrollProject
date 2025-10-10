@@ -1727,7 +1727,7 @@ class ScrollView(StencilView):
             return True
             
         # Check if position changed
-        threshold = 0.0001
+        threshold = 0.00001
         pos_changed = (abs(current_pos[0] - self._last_scroll_pos[0]) > threshold or
                       abs(current_pos[1] - self._last_scroll_pos[1]) > threshold)
         
