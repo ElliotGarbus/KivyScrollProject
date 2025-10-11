@@ -791,17 +791,15 @@ class ScrollView(StencilView):
     # TOUCH USER DATA (touch.ud) KEY DOCUMENTATION
     # ============================================
     # This section documents all touch.ud keys used across ScrollView,
-    # NestedScrollViewManager, and their interaction with Kivy's DragBehavior.
     # 
     # KEY NAMING CONVENTIONS:
     # ----------------------
     # 
-    # SHARED 'sv.' NAMESPACE (Gesture Widget Coordination):
-    # -----------------------------------------------------
-    # Both ScrollView and DragBehavior use 'sv.' prefixed keys via their _get_uid()
-    # methods to coordinate gesture ownership. This shared namespace allows widgets
-    # to detect when a touch is being used for gestures (scrolling/dragging) vs
-    # normal widget interactions (button clicks, etc).
+    # PER-INSTANCE 'sv.' NAMESPACE:
+    # -----------------------------
+    # ScrollView uses 'sv.' prefixed keys via _get_uid() to create instance-specific
+    # keys like 'sv.123' where 123 is the widget's unique ID. Each ScrollView only
+    # checks its own keys - they do NOT share or coordinate via these keys.
     #
     # Per-ScrollView Instance Keys:
     # - sv.<uid>: Primary state dict for this ScrollView instance
@@ -820,6 +818,12 @@ class ScrollView(StencilView):
     # - svavoid.<uid>: Flag indicating this ScrollView should avoid handling this touch
     #   Set when: Mouse wheel events are handled, or touch doesn't collide
     #   Purpose: Prevents double-processing of already-handled touches
+    #   Note: Each widget has its own svavoid key; they do NOT coordinate
+    #
+    # - claimed_by_child.<uid>: Flag indicating a child widget has claimed this touch
+    #   Set when: _change_touch_mode delegates touch to children (timeout expired)
+    #   Purpose: Prevents ScrollView from re-initializing scroll after child claimed touch
+    #   Used in: _scroll_initialize and _scroll_update to skip processing
     #
     # Cross-ScrollView Shared Keys:
     # - sv.handled: dict {'x': bool, 'y': bool}
@@ -837,7 +841,14 @@ class ScrollView(StencilView):
     # - nsvm: dict - Manager state for nested ScrollView coordination
     #   Contains: {
     #     'nested_managed': NestedScrollViewManager instance,
-    #     'mode': str  # 'inner' or 'outer' - which ScrollView handles this touch
+    #     'mode': str,  # 'inner' or 'outer' - which ScrollView handles this touch
+    #     'axis_config': dict (optional),  # For mixed XY cases: {
+    #                                      #   'outer_exclusive': list,  # axes only outer can scroll
+    #                                      #   'inner_exclusive': list,  # axes only inner can scroll
+    #                                      #   'shared': list            # axes both can scroll
+    #                                      # }
+    #     'delegation_mode': str (optional)  # 'unknown', 'locked', 'start_at_boundary'
+    #                                        # Tracks web-style delegation state for parallel scrolling
     #   }
     #   Purpose: Routes touches between outer and inner ScrollViews
     #   Lifecycle: Set in manager's on_touch_down, used throughout touch lifecycle
@@ -850,15 +861,12 @@ class ScrollView(StencilView):
     #   Affects: Touch routing, effect handling, movement calculations, delegation
     #   Rationale: Scroll bars are positioned at widget edges and cannot overlap,
     #              so multiple ScrollViews can safely share these global flags
-    #
-    # KIVY DRAGBEHAVIOR COORDINATION:
-    # --------------------------------
-    # DragBehavior (from kivy.uix.behaviors.drag) also uses 'sv.' prefixed keys
-    # via its _get_uid() method. The check `if not any(key.startswith('sv.') ...)`
-    # in on_touch_move allows ScrollView to detect when a touch is being used for
-    # dragging and delegate to children appropriately. This prevents conflicts
-    # between scrolling and dragging behaviors.
-    #
+
+    # Note: DragBehavior uses the same 'sv.' namespace via its _get_uid() method.
+    #       However, DragBehavior only checks its own keys - there is no inter-widget coordination
+    #       via these keys.
+    
+
     
     def _check_scroll_bounds(self, touch):
         """Check if touch is within scrollable bounds and set in_bar flags."""
@@ -1343,16 +1351,15 @@ class ScrollView(StencilView):
         if touch.grab_current is not self:
             return True
         
-        # GESTURE WIDGET COORDINATION CHECK
-        # =================================
-        # Check if any gesture-handling widget (ScrollView or DragBehavior) has 
-        # established state for this touch by looking for 'sv.' prefixed keys.
-        # Both ScrollView and DragBehavior use the shared 'sv.' namespace via 
-        # their _get_uid() methods to coordinate touch ownership.
+        # SCROLLVIEW STATE CHECK
+        # ======================
+        # Check if this ScrollView has established state for this touch by 
+        # looking for 'sv.' prefixed keys that match this widget's UID.
         #
-        # If NO 'sv.' keys exist, neither scrolling nor dragging is active,
+        # If NO 'sv.' keys exist for this ScrollView, scrolling is not active,
         # so this touch should be passed to child widgets (buttons, etc.)
         # to prevent crashes and ensure proper widget interaction.
+      
         if not any(isinstance(key, str) and key.startswith('sv.')
                    for key in touch.ud):
             # Handle dragged widgets - pass to children to prevent crashes
