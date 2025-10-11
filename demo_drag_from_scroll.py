@@ -33,55 +33,88 @@ class DraggableButton(DragBehavior, Button):
     original_parent = None
     float_parent = None  # Will hold reference to FloatLayout for reparenting
     original_index = 0
+    reparented = False  # Track if we've already reparented
+    touch_start_pos = None  # Track where touch started
+    active_touch = None  # Track the touch that pressed this button
+    was_pressed = False  # Track if button was pressed (on_press fired)
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Set drag properties
-        self.drag_timeout = 100
-        self.drag_distance = 20
+        # Set drag properties - use timeout to prevent auto-grab
+        self.drag_timeout = 200
+        self.drag_distance = 10
         # Bind to update drag_rectangle when position/size changes
         self.bind(pos=self.update_drag_rectangle, size=self.update_drag_rectangle)
+        # Bind to on_press to detect button clicks
+        self.bind(on_press=self.handle_press)
     
     def update_drag_rectangle(self, *args):
         """Update drag_rectangle to match button's current position and size."""
         self.drag_rectangle = [self.x, self.y, self.width, self.height]
     
+    def handle_press(self, instance):
+        """Called when button is pressed (clicked without dragging)."""
+        self.was_pressed = True
+    
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
-            # Store original position in window coordinates
+            # Store original state for potential drag
             self.original_pos = self.to_window(*self.pos)
             self.original_parent = self.parent
             self.original_index = self.parent.children.index(self)
-            print(f'Touch down on button "{self.text}" at {touch.pos}')
+            self.reparented = False
+            self.dragging = False
+            self.was_pressed = False
+            self.touch_start_pos = touch.pos[:]
+            self.active_touch = touch
         return super().on_touch_down(touch)
     
     def on_touch_move(self, touch):
-        if touch.grab_current is self:
-            # On first move, reparent to FloatLayout so button appears on top
-            if not self.dragging and self.float_parent and self.parent != self.float_parent:
-                # Convert position to window coordinates before reparenting
+        # Check if this is our active touch and has moved beyond drag_distance
+        if self.active_touch is touch and self.touch_start_pos and not self.reparented:
+            dx = touch.pos[0] - self.touch_start_pos[0]
+            dy = touch.pos[1] - self.touch_start_pos[1]
+            distance = (dx**2 + dy**2)**0.5
+            
+            # Don't reparent if button was pressed (not a drag gesture)
+            if self.was_pressed:
+                return super().on_touch_move(touch)
+            
+            # Reparent when drag threshold is exceeded
+            if distance >= self.drag_distance and self.float_parent and self.parent != self.float_parent:
+                # Store original size and position
+                original_size = self.size[:]
                 window_pos = self.to_window(*self.pos)
                 
-                # Remove from original parent
+                # Reparent to FloatLayout so button appears on top during drag
                 self.parent.remove_widget(self)
-                
-                # Add to FloatLayout
+                self.size_hint = (None, None)
+                self.size = original_size
                 self.float_parent.add_widget(self)
-                
-                # Set position in FloatLayout's coordinate space
                 self.pos = self.float_parent.to_widget(*window_pos)
                 
-                print(f'Reparented button "{self.text}" to FloatLayout')
-            
-            self.opacity = 0.6
-            self.dragging = True
+                self.reparented = True
+                self.dragging = True
+                self.opacity = 0.6
+        
         return super().on_touch_move(touch)
     
     def on_touch_up(self, touch):
+        # If button was pressed and got reparented, restore it immediately
+        if self.was_pressed and self.reparented and self.parent != self.original_parent:
+            self.parent.remove_widget(self)
+            self.original_parent.add_widget(self, index=self.original_index)
+            self.pos = self.original_parent.to_widget(*self.original_pos)
+            self.reparented = False
+            self.dragging = False
+            self.opacity = 1
+        
+        # Cleanup
+        if touch is self.active_touch:
+            self.active_touch = None
         if self.dragging:
             self.opacity = 1
             self.dragging = False
-            print(f'Touch up on button "{self.text}", dragging was True')
         return super().on_touch_up(touch)
 
 
@@ -245,47 +278,26 @@ class DragFromScrollDemo(App):
         if not hasattr(instance, 'dragging') or not instance.dragging:
             return
         
-        print(f"[DRAG] Button '{instance.text}' drag completed")
-        print(f"[DRAG] Touch position: {touch.pos}")
-        
-        # Use touch position directly to check collision with landing zone
-        # Transform touch position to landing zone's coordinate space
+        # Check if button was dropped in landing zone
         touch.push()
         touch.apply_transform_2d(self.landing_zone.to_widget)
         collision = self.landing_zone.collide_point(*touch.pos)
         touch.pop()
         
-        print(f"[DRAG] Landing zone bounds (local): pos={self.landing_zone.pos}, size={self.landing_zone.size}")
-        print(f"[DRAG] Collision check: {collision}")
-        
         if collision:
-            # Success! Button dropped in landing zone
-            print(f"[SUCCESS] Button '{instance.text}' dropped in landing zone - REMOVING")
+            # Success! Remove button
             self.landing_zone.set_success()
-            
-            # Remove the button from the scroll content
             if instance.parent:
                 instance.parent.remove_widget(instance)
-            
-            # Reset landing zone color after a delay
             Clock.schedule_once(lambda dt: self.landing_zone.reset(), 0.5)
         else:
-            # Failed - return button to original parent and position
-            print(f"[RESET] Button '{instance.text}' missed landing zone - returning")
+            # Failed - return button to original position
             self.landing_zone.reset()
-            
-            # If button was reparented to FloatLayout, move it back
             if instance.parent != instance.original_parent:
-                # Remove from FloatLayout
                 instance.parent.remove_widget(instance)
-                
-                # Add back to original parent at original index
                 instance.original_parent.add_widget(instance, index=instance.original_index)
-                
-                # Convert original window position back to parent's coordinate space
                 instance.pos = instance.original_parent.to_widget(*instance.original_pos)
             else:
-                # Just animate back to original position
                 anim = Animation(pos=instance.original_pos, duration=0.3)
                 anim.start(instance)
 
