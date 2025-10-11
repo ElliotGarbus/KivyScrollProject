@@ -71,7 +71,7 @@ class LandingZone(Widget):
         self.hover_color = [0.5, 0.5, 0.1, 1]    # Yellow
         self.success_color = [0.1, 0.6, 0.1, 1]  # Green
         
-        with self.canvas:
+        with self.canvas.before:
             self.bg_color = Color(*self.default_color)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
         
@@ -83,7 +83,8 @@ class LandingZone(Widget):
             bold=True,
             color=[1, 1, 1, 1],
             halign='center',
-            valign='middle'
+            valign='middle',
+            size_hint=(1, 1)
         )
         self.label.bind(size=self.label.setter('text_size'))
         self.add_widget(self.label)
@@ -91,6 +92,9 @@ class LandingZone(Widget):
     def update_rect(self, *args):
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
+        # Update label position to match
+        self.label.pos = self.pos
+        self.label.size = self.size
     
     def set_hover(self, is_hovering):
         """Change color when button is hovering over landing zone."""
