@@ -28,14 +28,13 @@ Scrollbar scrolling behavior:
 - For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
 """
 
-
-
-# TODO: test interation with draggable widgets.
+# TODO: re-check all nested demos with parallel_delegation set to False
 # TODO: clean up code/implementation comments.
 # TODO: Create documentation for the NestedScrollViewManager.
 # TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
 # TODO: Register the NestedScrollViewManager with kv.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
+# TODO: Add developer documentation to DragBehavior about the touch metadata and ScrollView.
 # TODO: formatting prior to PR
 
 # Requested Feature: dwelling on a non-button widget can be turned into a scroll.
@@ -59,16 +58,16 @@ class NestedScrollViewManager(RelativeLayout):
     """
     Controls boundary delegation for parallel nested ScrollViews.
     
-    When True (web-style):
+    When True (default, web-style):
     - Touch starting at inner boundary, moving away from boundary → delegates to outer scrollview
     - else → scrolls inner only, never delegates
     
-    When False (default):
+    When False:
     - No delegation, only touched scrollview scrolls
     - Inner scrollview shows overscroll effects at boundaries
     - Touch stays with initially touched scrollview for entire gesture
     
-    Default: False (no boundary delegation)
+    Default: True (web-style)
     """
 
     def __init__(self, **kwargs):
