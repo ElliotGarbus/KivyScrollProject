@@ -37,7 +37,7 @@ class DraggableButton(DragBehavior, Button):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Set drag properties
-        self.drag_timeout = 10000000
+        self.drag_timeout = 100
         self.drag_distance = 20
         # Bind to update drag_rectangle when position/size changes
         self.bind(pos=self.update_drag_rectangle, size=self.update_drag_rectangle)
