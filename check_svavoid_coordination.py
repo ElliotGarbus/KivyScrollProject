@@ -9,9 +9,10 @@ Both ScrollView and DragBehavior use a "delayed grab" pattern with identical log
 SHARED PATTERN:
 - Timeout: Both use 55ms default (scroll_timeout / drag_timeout)
 - Distance: Both use 20px default (scroll_distance / drag_distance)  
-- Decision: Wait to determine if touch is a gesture (scroll/drag) or click
-- Grab: Only grab touch after confirming it's a gesture
-- Delegate: If timeout expires without gesture, ungrab and re-dispatch to children
+- Grab: Grab touch IMMEDIATELY when it could become a gesture (optimistic grab)
+- Decision: Set mode='unknown', wait to determine if it's a gesture or click
+- Confirm: If distance threshold exceeded → gesture confirmed (mode='drag' or 'scroll')
+- Timeout: If timeout expires with mode still 'unknown' → ungrab and re-dispatch to children
 
 SVAVOID PURPOSE (Per-Widget, No Cross-Widget Coordination):
 - Each widget has its own UID-namespaced svavoid key (e.g., svavoid.123)
