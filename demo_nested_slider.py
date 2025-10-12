@@ -77,7 +77,7 @@ class NestedSliderDemo(App):
             
             # Add row label
             row_label = Label(
-                text=f'Row {i+1}\nHorizontal Scroll →',
+                text=f'Row {i+1}\nHorizontal Scroll ->',
                 size_hint_x=None,
                 width=dp(150),
                 color=[1, 1, 1, 1],
