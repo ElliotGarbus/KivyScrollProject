@@ -82,6 +82,7 @@ Demonstrations/tests using the updated scrollview and the NestedScrollManager:
 - demo_drag_nested_scroll.py - Dragging buttons out of nested orthogonal ScrollViews 
 
 Other Files:
+- check_svavoid_coordination.py - explore the role of the 'svavoid' metadata in ScrollView and DragBehavior
 - og_nested_verticals.py - demonstrates the kivy v2.31 nesting.  Only parallel nesting is supported, has artifacts.
 - my_scrollview.py - attempt to support nesting with minor modificaitons to the original ScrollView. (Abandoned)
 
