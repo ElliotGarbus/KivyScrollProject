@@ -1361,7 +1361,7 @@ class ScrollView(StencilView):
       
         if not any(isinstance(key, str) and key.startswith('sv.')
                    for key in touch.ud):
-            # Handle dragged widgets - pass to children to prevent crashes
+            # Handle missing sv
             return self._delegate_to_children(touch, 'on_touch_move')
         
         # DIRECT SCROLL DISPATCH: 
