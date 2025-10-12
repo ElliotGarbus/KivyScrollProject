@@ -5,6 +5,10 @@ This module provides a centralized touch routing coordinator for nested ScrollVi
 It manages touch events between outer and inner ScrollViews to prevent conflicts
 and ensure proper event flow.
 
+Requirements:
+- The outer ScrollView's viewport MUST be a Layout widget (BoxLayout, GridLayout,
+  FloatLayout, etc.). Non-Layout widgets (Label, Image, Button) will raise TypeError.
+
 Key Design Decisions:
 1. Touch Management: controls touch routing between outer and inner ScrollViews
 2. State Tracking: Uses touch.ud keys to track nested scroll state
@@ -50,6 +54,58 @@ class NestedScrollViewManager(RelativeLayout):
     This manager intercepts touch events and routes them appropriately between
     outer and inner ScrollViews, preventing conflicts and ensuring proper
     event flow in nested scrolling scenarios.
+    
+    Requirements:
+        - The outer ScrollView's viewport must be a Layout widget (BoxLayout,
+          GridLayout, FloatLayout, etc.) that has a 'children' attribute.
+        - Non-Layout widgets (Label, Image, Button, etc.) cannot be used as
+          the viewport for nested scrolling.
+    
+    Raises:
+        TypeError: If the outer ScrollView's viewport is not a Layout widget
+                   (raised on first touch event).
+    
+    Example (Python):
+        # Correct usage
+        manager = NestedScrollViewManager()
+        outer_sv = ScrollView()
+        layout = BoxLayout(orientation='vertical')  # Layout widget
+        outer_sv.add_widget(layout)
+        manager.add_widget(outer_sv)
+        
+        # Incorrect usage (will raise TypeError on touch)
+        manager = NestedScrollViewManager()
+        outer_sv = ScrollView()
+        outer_sv.add_widget(Label(text="Error"))  # Not a Layout!
+        manager.add_widget(outer_sv)
+    
+    Example (KV Language):
+        # Correct usage
+        NestedScrollViewManager:
+            ScrollView:
+                do_scroll_y: True
+                do_scroll_x: False
+                BoxLayout:  # Layout widget - required!
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    
+                    ScrollView:
+                        do_scroll_y: False
+                        do_scroll_x: True
+                        size_hint_y: None
+                        height: 100
+                        GridLayout:
+                            cols: 10
+                            size_hint_x: None
+                            width: self.minimum_width
+                            # inner content here
+        
+        # Incorrect usage (will raise TypeError on touch)
+        NestedScrollViewManager:
+            ScrollView:
+                Label:  # Error! Not a Layout widget
+                    text: 'This will fail on touch'
     """
 
     parallel_delegation = BooleanProperty(True)
@@ -241,10 +297,6 @@ class NestedScrollViewManager(RelativeLayout):
         # MOUSE WHEEL SPECIAL HANDLING:
         if wheel_scroll:
             if inner_scrollview:
-                outer_axes = (outer_scrollview.do_scroll_x, outer_scrollview.do_scroll_y)
-                inner_axes = (inner_scrollview.do_scroll_x, inner_scrollview.do_scroll_y)
-                are_parallel = outer_axes == inner_axes
-                
                 # Determine scroll direction from button
                 is_horizontal_wheel = touch.button in ('scrollleft', 'scrollright')
                 is_vertical_wheel = touch.button in ('scrollup', 'scrolldown')
@@ -257,7 +309,7 @@ class NestedScrollViewManager(RelativeLayout):
                 target_scrollview = None
                 use_parallel_rules = False
                 
-                if are_parallel:
+                if is_parallel:
                     # Pure parallel case: use collision-based routing for all wheel directions
                     use_parallel_rules = True
                 else:
@@ -392,11 +444,14 @@ class NestedScrollViewManager(RelativeLayout):
         outer_scrollview = self.outer_scrollview
         
         # Check for claimed_by_child flag from either inner or outer scrollview
+        # This flag is set by ScrollView._change_touch_mode when the scroll timeout
+        # expires without reaching scroll_distance threshold, indicating the touch
+        # should be handled by a child widget (e.g., Button, Slider) instead of scrolling.
         inner_uid = inner_scrollview._get_uid('claimed_by_child') if inner_scrollview else None
         outer_uid = outer_scrollview._get_uid('claimed_by_child') if outer_scrollview else None
         
         if (inner_uid and inner_uid in touch.ud) or (outer_uid and outer_uid in touch.ud):
-            # Delegate to children so button can handle the move
+            # Child widget (button, etc.) has claimed this touch - delegate to it
             mode = touch.ud['nsvm']['mode']
             scrollview = outer_scrollview if mode == 'outer' else inner_scrollview
             return self._delegate_to_scrollview_children(touch, scrollview)
@@ -435,8 +490,6 @@ class NestedScrollViewManager(RelativeLayout):
                 outer_uid = self.outer_scrollview._get_uid()
                 if outer_uid not in touch.ud:
                     # CRITICAL: Create touch.ud[uid] entry for outer scrollview
-                    # Without this, on_scroll_move will call on_scroll_start (see line 1317-1320 in updated_sv.py)
-                    # which disrupts the touch flow and causes stuck buttons
                     touch.ud[outer_uid] = {
                         'mode': 'scroll',  # Already scrolling (delegated mid-gesture)
                         'dx': 0,
@@ -449,24 +502,12 @@ class NestedScrollViewManager(RelativeLayout):
 
                     # Initialize scroll effects with current touch position
                     self.outer_scrollview._initialize_scroll_effects(touch, in_bar=False)
-
-                    # Set the active touch for outer scrollview
                     self.outer_scrollview._touch = touch
-
-                    # Grab for outer scrollview
                     touch.grab(self.outer_scrollview)
-
-                    # Switch mode to 'outer' - inner is now locked, all scrolling goes to outer
                     touch.ud['nsvm']['mode'] = 'outer'
                     
                     # Dispatch on_scroll_start for outer scrollview (delegation)
                     self.outer_scrollview.dispatch('on_scroll_start')
-
-                    # Clear inner scrollview's _touch
-                    # NOTE: We don't call _stop_scroll_effects for mixed cases because
-                    # the inner may still be scrollable on non-delegated axes
-                    # (e.g., V outer + XY inner: Y delegates, but X still scrolls on inner)
-                    # Stopping effects would reset scroll position on all axes, causing jumps
                     if self.inner_scrollview:
                         self.inner_scrollview._touch = None
 
@@ -476,7 +517,6 @@ class NestedScrollViewManager(RelativeLayout):
                 # Temporarily transfer grab ownership for outer ScrollView delegation
                 touch.ungrab(self)
                 touch.grab(self.outer_scrollview)
-                
                 outer_result = self.outer_scrollview._scroll_update(touch)
 
                 # Restore grab ownership to manager
@@ -484,10 +524,14 @@ class NestedScrollViewManager(RelativeLayout):
                 touch.grab(self)
                 touch.pop()
 
-                # CRITICAL: Always return True for delegated touches to prevent button presses
-                # Even if outer ScrollView returns False, we've handled the delegation
+                # CRITICAL: Always return True when delegating from inner to outer
+                # This prevents the touch from being re-dispatched to child widgets (buttons).
+                # Context: When we delegate mid-gesture from inner to outer scrollview, the touch
+                # is already committed to scrolling. Returning False here would allow the touch
+                # to propagate to child widgets, causing unwanted button presses during scroll.
+                # Even if outer_result is False (e.g., at scroll boundary), we've taken ownership
+                # of this touch for scrolling, so we must return True to consume it.
                 return True
-
             return result
 
         elif mode == 'outer':
@@ -496,8 +540,8 @@ class NestedScrollViewManager(RelativeLayout):
                 touch, self.outer_scrollview,
                 lambda t: self.outer_scrollview._scroll_update(t)
             )
-
-        return False
+        # This should never be reached - mode must be 'inner' or 'outer'
+        raise ValueError(f"Invalid mode in on_touch_move: {mode}")
 
     def on_touch_up(self, touch):
         """
@@ -526,7 +570,6 @@ class NestedScrollViewManager(RelativeLayout):
 
                 # Update effect bounds before stopping
                 self.inner_scrollview._update_effect_bounds()
-
                 uid = self.inner_scrollview._get_uid()
                 if uid in touch.ud:
                     # Normal scroll stop
@@ -542,7 +585,6 @@ class NestedScrollViewManager(RelativeLayout):
 
                 # Update effect bounds before stopping
                 self.outer_scrollview._update_effect_bounds()
-
                 uid = self.outer_scrollview._get_uid()
                 if uid in touch.ud:
                     # Normal scroll stop
@@ -551,7 +593,7 @@ class NestedScrollViewManager(RelativeLayout):
                         FocusBehavior.ignored_touch.append(touch)
                 touch.pop()
             else:
-                raise ValueError(f"Invalid mode: {mode}")
+                raise ValueError(f"Invalid mode in on_touch_up: {mode}")
             
             # Delete uid from touch.ud to prevent double-processing
             # We've already called _scroll_finalize above, so scrollview's on_touch_up shouldn't process it again
