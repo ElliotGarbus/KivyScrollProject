@@ -818,7 +818,8 @@ class ScrollView(StencilView):
     # - svavoid.<uid>: Flag indicating this ScrollView should avoid handling this touch
     #   Set when: Mouse wheel events are handled, or touch doesn't collide
     #   Purpose: Prevents double-processing of already-handled touches
-    #   Note: Each widget has its own svavoid key; they do NOT coordinate
+    #   Note: Each widget (ScrollView, DragBehavior) has its own UID-namespaced svavoid key.
+    #         Widgets do NOT coordinate via svavoid - each checks only its own key.
     #
     # - claimed_by_child.<uid>: Flag indicating a child widget has claimed this touch
     #   Set when: _change_touch_mode delegates touch to children (timeout expired)
@@ -862,9 +863,6 @@ class ScrollView(StencilView):
     #   Rationale: Scroll bars are positioned at widget edges and cannot overlap,
     #              so multiple ScrollViews can safely share these global flags
 
-    # Note: DragBehavior uses the same 'sv.' namespace via its _get_uid() method.
-    #       However, DragBehavior only checks its own keys - there is no inter-widget coordination
-    #       via these keys.
     
 
     
