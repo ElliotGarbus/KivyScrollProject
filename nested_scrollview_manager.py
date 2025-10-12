@@ -28,7 +28,6 @@ Scrollbar scrolling behavior:
 - For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
 """
 
-# TODO: re-check all nested demos with parallel_delegation set to False
 # TODO: clean up code/implementation comments.
 # TODO: Create documentation for the NestedScrollViewManager.
 # TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
@@ -36,7 +35,7 @@ Scrollbar scrolling behavior:
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
 # TODO: formatting prior to PR
 
-# Requested Feature: dwelling on a non-button widget can be turned into a scroll.
+# TODO: Requested Feature: dwelling on a non-button widget can be turned into a scroll.
 
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.behaviors import FocusBehavior
@@ -120,6 +119,15 @@ class NestedScrollViewManager(RelativeLayout):
         that collide with the touch point, avoiding unnecessary tree traversal.
         """
         viewport = self.outer_scrollview._viewport
+        
+        # Validate that viewport contains children (is a Layout)
+        if not hasattr(viewport, 'children'):
+            raise TypeError(
+                f"NestedScrollViewManager: The outer ScrollView's viewport must be a Layout widget "
+                f"to support nested scrolling. Got {type(viewport).__name__} which has no 'children' attribute. "
+                f"Use BoxLayout, GridLayout, FloatLayout, or similar container widgets."
+            )
+        
         # Transform touch to viewport space
         touch.push()
         touch.apply_transform_2d(viewport.to_widget)
