@@ -818,6 +818,7 @@ class ScrollView(StencilView):
     # - svavoid.<uid>: Flag indicating this ScrollView should avoid handling this touch
     #   Set when: Mouse wheel events are handled, or touch doesn't collide
     #   Purpose: Prevents double-processing of already-handled touches
+    #
     #   Note: Each widget (ScrollView, DragBehavior) has its own UID-namespaced svavoid key.
     #         Widgets do NOT coordinate via svavoid - each checks only its own key.
     #

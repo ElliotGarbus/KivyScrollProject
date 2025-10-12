@@ -34,7 +34,6 @@ Scrollbar scrolling behavior:
 # TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
 # TODO: Register the NestedScrollViewManager with kv.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
-# TODO: Add developer documentation to DragBehavior about the touch metadata and ScrollView.
 # TODO: formatting prior to PR
 
 # Requested Feature: dwelling on a non-button widget can be turned into a scroll.
@@ -395,18 +394,6 @@ class NestedScrollViewManager(RelativeLayout):
             return self._delegate_to_scrollview_children(touch, scrollview)
         
         mode = touch.ud['nsvm']['mode']
-
-        # GESTURE WIDGET COORDINATION CHECK
-        # =================================
-        # Check if any gesture-handling widget (ScrollView or DragBehavior) has 
-        # established state for this touch by looking for 'sv.' prefixed keys.
-        # Both ScrollView and DragBehavior use the shared 'sv.' namespace via 
-        # their _get_uid() methods to coordinate touch ownership.
-        #
-        # If NO 'sv.' keys exist, neither scrolling nor dragging is active,
-        # so this touch should be passed to child widgets (buttons, etc.)
-        # to ensure proper widget interaction.
-        # TODO: Add comment to DragBehavior about this.
 
         if not any(isinstance(key, str) and key.startswith('sv.')
                    for key in touch.ud):
