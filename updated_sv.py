@@ -151,6 +151,7 @@ from kivy.animation import Animation
 from kivy.config import Config
 from kivy.clock import Clock
 from kivy.factory import Factory
+from kivy.graphics import PushMatrix, Translate, PopMatrix, Canvas
 from kivy.uix.stencilview import StencilView
 from kivy.metrics import dp
 from kivy.effects.dampedscroll import DampedScrollEffect
@@ -531,14 +532,8 @@ class ScrollView(StencilView):
     _MOUSE_WHEEL_DECREASE = {'scrolldown', 'scrollleft'}  # negative direction
     _MOUSE_WHEEL_INCREASE = {'scrollup', 'scrollright'}   # positive direction
 
-    # private, for internal use only
-
     _viewport = ObjectProperty(None, allownone=True)
     _bar_color = ListProperty([0, 0, 0, 0])
-    _effect_x_start_width = None
-    _effect_y_start_height = None
-    _update_effect_bounds_ev = None
-    _bind_inactive_bar_color_ev = None
 
     def _set_viewport_size(self, instance, value):
         self.viewport_size = value
@@ -559,8 +554,12 @@ class ScrollView(StencilView):
         self._position_check_ev = None
         self._last_scroll_pos = None
         self._stable_frames = 0
+        # For scroll effect tracking
+        self._effect_x_start_width = None
+        self._effect_y_start_height = None
+        self._update_effect_bounds_ev = None
+        self._bind_inactive_bar_color_ev = None
         # create a specific canvas for the viewport
-        from kivy.graphics import PushMatrix, Translate, PopMatrix, Canvas
         self.canvas_viewport = Canvas()
         self.canvas = Canvas()
         with self.canvas_viewport.before:
@@ -700,7 +699,7 @@ class ScrollView(StencilView):
         m.translate(tx, ty, 0)
         return super(ScrollView, self)._apply_transform(m, (0, 0))
 
-    def simulate_touch_down(self, touch):
+    def _simulate_touch_down(self, touch):
         # CONTROLLED TOUCH RE-DISPATCH TO CHILD WIDGETS
         # ==============================================
         # This method safely re-dispatches touch events to child widgets, typically
@@ -717,17 +716,17 @@ class ScrollView(StencilView):
         
         # Only ungrab nested manager if we're currently grabbed by it
         # This prevents interfering with the manager's touch_up handling
-        if 'nsvm' in touch.ud and touch.grab_current == touch.ud['nsvm']['nested_managed']:
-            touch.ungrab(touch.ud['nsvm']['nested_managed'])
+        if 'nsvm' in touch.ud and touch.grab_current == touch.ud['nsvm']['nested_manager']:
+            touch.ungrab(touch.ud['nsvm']['nested_manager'])
             
         ret = super(ScrollView, self).on_touch_down(touch)
         
         # If we ungrabbed the manager and no child grabbed the touch, restore the grab
         # This ensures the manager can still handle touch_up properly
         if ('nsvm' in touch.ud and 
-            original_grab_current == touch.ud['nsvm']['nested_managed'] and 
+            original_grab_current == touch.ud['nsvm']['nested_manager'] and 
             touch.grab_current is None):
-            touch.grab(touch.ud['nsvm']['nested_managed'])
+            touch.grab(touch.ud['nsvm']['nested_manager'])
             
         touch.pop()
         return ret
@@ -842,7 +841,7 @@ class ScrollView(StencilView):
     # -----------------------------------
     # - nsvm: dict - Manager state for nested ScrollView coordination
     #   Contains: {
-    #     'nested_managed': NestedScrollViewManager instance,
+    #     'nested_manager': NestedScrollViewManager instance,
     #     'mode': str,  # 'inner' or 'outer' - which ScrollView handles this touch
     #     'axis_config': dict (optional),  # For mixed XY cases: {
     #                                      #   'outer_exclusive': list,  # axes only outer can scroll
@@ -864,9 +863,6 @@ class ScrollView(StencilView):
     #   Rationale: Scroll bars are positioned at widget edges and cannot overlap,
     #              so multiple ScrollViews can safely share these global flags
 
-    
-
-    
     def _check_scroll_bounds(self, touch):
         """Check if touch is within scrollable bounds and set in_bar flags."""
         vp = self._viewport
@@ -907,7 +903,7 @@ class ScrollView(StencilView):
         # NESTED WHEEL ROUTING LOGIC:
         # Critical for nested ScrollViews - prevents inner SV from consuming
         # wheel events it can't handle, allowing outer SV to process them.
-        # TODO: modify touch ud as required when returning False
+        # When returning False, NestedScrollViewManager handles the delegation.
         
         if btn in self._MOUSE_WHEEL_HORIZONTAL:
             # Horizontal wheel: only handle if we can scroll horizontally
@@ -923,11 +919,6 @@ class ScrollView(StencilView):
                     (self._viewport and self._viewport.height > self.height)
             )):
                 return False  # Pass to outer ScrollView
-                
-        # Check if we're at scroll boundaries
-        if self._is_at_scroll_boundary(btn):
-            return False
-            
         # Select appropriate scroll effect
         e = self._select_scroll_effect_for_wheel(btn, in_bar_x, in_bar_y)
         if not e:
@@ -935,23 +926,9 @@ class ScrollView(StencilView):
             
         # Dispatch on_scroll_start for mouse wheel scrolling
         self.dispatch('on_scroll_start')
-        
-        # Apply wheel scroll movement
         self._apply_wheel_scroll(e, btn, m)
         e.trigger_velocity_update()
         return True
-
-    def _is_at_scroll_boundary(self, btn):
-        """Check if scroll is at boundary for the given wheel direction."""
-        if (btn in self._MOUSE_WHEEL_VERTICAL and 
-            ((btn == 'scrolldown' and self.scroll_y >= 1) or
-             (btn == 'scrollup' and self.scroll_y <= 0))):
-            return True
-        if (btn in self._MOUSE_WHEEL_HORIZONTAL and
-            ((btn == 'scrollleft' and self.scroll_x >= 1) or
-             (btn == 'scrollright' and self.scroll_x <= 0))):
-            return True
-        return False
 
     def _select_scroll_effect_for_wheel(self, btn, in_bar_x, in_bar_y):
         """Select the appropriate scroll effect for mouse wheel scrolling."""
@@ -1049,7 +1026,7 @@ class ScrollView(StencilView):
             return False
         
         # Get the outer scrollview to check if it can handle orthogonal movement
-        manager = touch.ud['nsvm'].get('nested_managed')
+        manager = touch.ud['nsvm']['nested_manager']
         if not manager or not manager.outer_scrollview:
             return False
         
@@ -1069,7 +1046,7 @@ class ScrollView(StencilView):
         # Vertical movement that inner can't handle, but outer can
         if abs_dy > abs_dx * 2 and not self.do_scroll_y and outer.do_scroll_y:
             return True
-        
+
         return False
 
     def _should_delegate_mixed(self, touch):
@@ -1137,11 +1114,11 @@ class ScrollView(StencilView):
         if 'nsvm' not in touch.ud:
             return False
         
-        manager = touch.ud['nsvm'].get('nested_managed')
+        manager = touch.ud['nsvm']['nested_manager']
         if not manager or not manager.parallel_delegation:
             return False
         
-        delegation_mode = touch.ud.get('nsvm', {}).get('delegation_mode', 'unknown')
+        delegation_mode = touch.ud['nsvm']['delegation_mode']
         
         # If not in delegation mode, never lock
         if delegation_mode == 'unknown':
@@ -1194,7 +1171,7 @@ class ScrollView(StencilView):
             return False
         
         width = self.width
-        if touch.ud.get('in_bar_x', False):
+        if touch.ud['in_bar_x']:
             if self.hbar[1] != 1:
                 dx = touch.dx / float(width - width * self.hbar[1])
                 self.scroll_x = min(max(self.scroll_x + dx, 0.), 1.)
@@ -1212,7 +1189,7 @@ class ScrollView(StencilView):
             return False
         
         height = self.height
-        if touch.ud.get('in_bar_y', False) and self.vbar[1] != 1.0:
+        if touch.ud['in_bar_y'] and self.vbar[1] != 1.0:
             dy = touch.dy / float(height - height * self.vbar[1])
             self.scroll_y = min(max(self.scroll_y + dy, 0.), 1.)
             self._trigger_update_from_scroll()
@@ -1255,7 +1232,7 @@ class ScrollView(StencilView):
         if not (self.do_scroll_x or self.do_scroll_y):
             # Scrolling is disabled for both axes
             # Re-dispatch to child content so non-scroll interactions (e.g., buttons) still work
-            return self.simulate_touch_down(touch)
+            return self._simulate_touch_down(touch)
 
         # handle mouse scrolling, only if the viewport size is bigger than the
         # scrollview size, and if the user allowed to do it
@@ -1283,7 +1260,7 @@ class ScrollView(StencilView):
             return False
         
         if scroll_type == ['bars'] and not in_bar:
-            return self.simulate_touch_down(touch)
+            return self._simulate_touch_down(touch)
         
         if in_bar:
             self._handle_scrollbar_jump(touch, in_bar_x, in_bar_y)
@@ -1314,8 +1291,8 @@ class ScrollView(StencilView):
         # Subsequent scrollviews (e.g., outer receiving delegation) should skip this check
         if 'nsvm' in touch.ud and not in_bar:
             # Only check if delegation_mode hasn't been set yet for this gesture
-            manager = touch.ud['nsvm'].get('nested_managed')
-            if manager and manager.parallel_delegation and manager.outer_scrollview:
+            manager = touch.ud['nsvm']['nested_manager']
+            if manager.parallel_delegation and manager.outer_scrollview:
                 outer = manager.outer_scrollview
                 
                 # PARALLEL DELEGATION: Only check boundaries in directions where BOTH
@@ -1342,6 +1319,11 @@ class ScrollView(StencilView):
         return True
 
     def on_touch_move(self, touch):
+        # STANDALONE SCROLLVIEW TOUCH HANDLING
+        # ====================================
+        # This method is only used when ScrollView operates standalone (not under
+        # NestedScrollViewManager). For nested scenarios, NestedScrollViewManager
+        # handles touch routing.
         # SINGLE-TOUCH POLICY: Only process our designated touch
         if self._touch is not touch:
             return self._delegate_to_children(touch, 'on_touch_move')
@@ -1350,14 +1332,8 @@ class ScrollView(StencilView):
         if touch.grab_current is not self:
             return True
         
-        # SCROLLVIEW STATE CHECK
-        # ======================
         # Check if this ScrollView has established state for this touch by 
         # looking for 'sv.' prefixed keys that match this widget's UID.
-        #
-        # If NO 'sv.' keys exist for this ScrollView, scrolling is not active,
-        # so this touch should be passed to child widgets (buttons, etc.)
-        # to prevent crashes and ensure proper widget interaction.
       
         if not any(isinstance(key, str) and key.startswith('sv.')
                    for key in touch.ud):
@@ -1382,7 +1358,6 @@ class ScrollView(StencilView):
         if self._get_uid('claimed_by_child') in touch.ud:
             return False
 
-        rv = True
         # By default this touch can be used to defocus currently focused
         # widget, like any touch outside of ScrollView.
         touch.ud['sv.can_defocus'] = True
@@ -1420,8 +1395,7 @@ class ScrollView(StencilView):
             # Only inner ScrollViews should delegate to outer ScrollViews
             # Outer ScrollViews (mode='outer') should not delegate further
             # Check if scrolling via scrollbar or content
-            not_in_bar = not touch.ud.get('in_bar_x', False) and \
-                not touch.ud.get('in_bar_y', False)
+            not_in_bar = not touch.ud['in_bar_x'] and not touch.ud['in_bar_y']
             
             # NESTED SCROLLVIEW DELEGATION (only for content scrolling, NOT scrollbar dragging)
             if 'nsvm' in touch.ud and touch.ud['nsvm'].get('mode') == 'inner' and not_in_bar:
@@ -1448,13 +1422,12 @@ class ScrollView(StencilView):
             ud['dt'] = touch.time_update - ud['time']
             ud['time'] = touch.time_update
             ud['user_stopped'] = True
-        return rv
+        return True
 
-
-
+# TODO: continue review from here
     def on_touch_up(self, touch):
-        # TOUCH RELEASE HANDLING AND CLEANUP
-        # ===================================
+        # STANDALONE SCROLLVIEW TOUCH HANDLING
+        
         # This method handles touch release events and ensures proper cleanup
         # of scroll state, grab ownership, and focus behavior. Critical for
         # preventing lingering touch ownership in nested ScrollView scenarios.
@@ -1511,8 +1484,7 @@ class ScrollView(StencilView):
         ud = touch.ud[uid]
         
         # Determine if this was a scroll bar interaction
-        not_in_bar = not touch.ud.get('in_bar_x', False) and \
-            not touch.ud.get('in_bar_y', False)
+        not_in_bar = not touch.ud['in_bar_x'] and not touch.ud['in_bar_y']
             
         # Stop scroll effects if they were active (not for bar interactions)
         self._stop_scroll_effects(touch, not_in_bar)
@@ -1532,7 +1504,7 @@ class ScrollView(StencilView):
             # Only simulate click if no scroll action occurred
             # (e.g., no scroll bar interaction or dragging)
             if not ud['scroll_action']:
-                self.simulate_touch_down(touch)  # Let children handle the "click"
+                self._simulate_touch_down(touch)  # Let children handle the "click"
             # Schedule delayed touch up to complete the click simulation
             Clock.schedule_once(partial(self._do_touch_up, touch), .2)
 
@@ -1844,7 +1816,7 @@ class ScrollView(StencilView):
         touch.apply_transform_2d(self.to_widget)
         touch.apply_transform_2d(self.to_parent)
         
-        child_grabbed = self.simulate_touch_down(touch)
+        child_grabbed = self._simulate_touch_down(touch)
         
         # Only clear ScrollView's state if a child widget grabbed the touch
         # If no child grabbed it, keep the sv. keys so scrolling can resume
