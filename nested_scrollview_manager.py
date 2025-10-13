@@ -243,7 +243,7 @@ class NestedScrollViewManager(RelativeLayout):
         #   - 'locked': delegating to outer, inner locked
         # orthogonal delegation is handled via sv.handled axis tracking
         touch.ud['nsvm'] = {
-            'nested_managed': self,
+            'nested_manager': self,
             'mode': None,  # 'inner' or 'outer'
             'delegation_mode': 'unknown'  # Will be set in ScrollView.on_scroll_start
         }
