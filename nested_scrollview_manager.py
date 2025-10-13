@@ -609,7 +609,7 @@ class NestedScrollViewManager(RelativeLayout):
         # Always delegate to children after cleanup
         # This ensures buttons/widgets get their on_touch_up even if gesture became a scroll
         # Critical for preventing stuck button states and for touches not managed by this manager
-        return super(NestedScrollViewManager, self).on_touch_up(touch)
+        return super().on_touch_up(touch)
 
 
 if __name__ == '__main__':
