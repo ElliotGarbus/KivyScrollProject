@@ -141,6 +141,21 @@ use. This will override the default effect set in
 
 All the effects are located in the :mod:`kivy.effects`.
 
+Nested ScrollViews
+------------------
+
+.. versionadded:: 3.0.0
+
+To create nested ScrollViews (a ScrollView inside another ScrollView), you must 
+use the :class:`~kivy.uix.scrollview.NestedScrollViewManager` widget. The manager 
+coordinates touch events between the outer and inner ScrollViews to provide 
+intuitive scrolling behavior.
+
+See the :class:`~kivy.uix.scrollview.NestedScrollViewManager` documentation for 
+more details on nested scrolling behavior and requirements.
+
+
+
 '''
 
 __all__ = ('ScrollView', )
