@@ -1,16 +1,20 @@
-Proposed implementation for nested ScrollView. This is a WIP.
+Proposed implementation for nested scrollviews. They will be under a NestedScrollViewManager. It will look something like this:
 
-An initial implementation is in the V0 Obsolete Directory
+```
+NestedScrollViewManager:
+    ScrollView:  # the outer scrollview
+        ...attributes and layout
+        ...
+        ...ScrollView:  # one or more scrollviews deeper in the widget tree
+```
+My objective is to deliver a solution that is more maintainable both for ScrollView and the NestedScrollViewManager.
 
-My objective is to deliver a solution that is more maintainable and supports nesting.
-
-This implementation will support an outer ScrollView and one or more inner ScrollViews.  
+The Nested ScrollView manager supports two levels of nesting.  An outer ScrollView and one or more inner ScrollViews.  
 All combinations for do_scroll_x and do_scroll_y are supported for the inner and outer ScrollView.
 
-The on_scroll_events (on_scroll_start, on_scroll_move, and on_stroll_stop) have been updated.
-They now work as expected, firing when the movement starts, continues and stops.
+The on_scroll_events (on_scroll_start, on_scroll_move, and on_stroll_stop) have been updated.  They now work as expected, firing when the movement starts, continues and stops.  
 
-**New ScrollView Properties**
+**ScrollView has a new property, slow_device_support**
 
 slow_device_support = BooleanProperty(False)
 
@@ -31,6 +35,8 @@ slow_device_support = BooleanProperty(False)
     to improve touch responsiveness.  If there is an issue with ScrollDetection on 
     lower performance devices, set slow_device_support to True.
 
+**The NestedScrollViewManger has one property, parallel_delegation**
+
 parallel_delegation = BooleanProperty(True)
 
     Controls boundary delegation for parallel nested ScrollViews.
@@ -50,15 +56,10 @@ parallel_delegation = BooleanProperty(True)
 
 
 Key files:
-Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollViewManger to route the touches 
-to the inner and outer scrollview.
-Things worked nicely, but I have decided to integrate the capabilities back into ScrollView, 
-rather than have two separate widgets.
-
  - nested_scrollview_manager.py - The NestedScrollViewManager
  - updated_sv.py - ScrollView simplified and adapted to work with the NestedScrollViewManager
 
-Demonstrations/tests using the updated scrollview:
+Demonstrations/tests using the updated scrollview and the NestedScrollManager:
 - demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) using the NestedScrollViewManager
 - demo_nested_horizontal.py - Horizontal parallel ScrollViews 
 - demo_nested_vertical.py - Multiple vertical parallel ScrollViews
