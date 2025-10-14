@@ -26,7 +26,7 @@ Factory.register('ScrollView', cls=ScrollView)
 
 
 KV = '''
-<HorizontalScrollRow>:
+<HorizontalScrollRow>:  # define the horizontal inner ScrollView
     do_scroll_x: True
     do_scroll_y: False
     size_hint_y: None
@@ -35,7 +35,7 @@ KV = '''
     bar_width: '10dp'
     scroll_type: ['bars', 'content']
     
-    BoxLayout:
+    BoxLayout: 
         id: content_layout
         orientation: 'horizontal'
         size_hint_x: None
@@ -59,7 +59,7 @@ NestedScrollViewManager:
             spacing: 20
 '''
 
-class HorizontalScrollRow(ScrollView):
+class HorizontalScrollRow(ScrollView): # define the horizontal inner ScrollView
     row_number = NumericProperty(0)
 
     def __init__(self, **kwargs):
@@ -78,11 +78,9 @@ class NestedScrollKVApp(App):
         return Builder.load_string(KV)
         
     def on_start(self):
-        # Dynamically create 5 horizontal ScrollViews with buttons
+        # Dynamically create horizontal inner ScrollViews
         for i in range(10):
-            # Create a horizontal ScrollView using the KV rule
             h_scroll = HorizontalScrollRow(row_number=i)
-            # Get the content layout
             self.root.ids.outer_layout.add_widget(h_scroll)
         
 
