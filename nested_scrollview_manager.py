@@ -1,39 +1,244 @@
-"""
-NestedScrollViewManager for Kivy
+'''
+NestedScrollViewManager
+=======================
 
-This module provides a centralized touch routing coordinator for nested ScrollViews.
-It manages touch events between outer and inner ScrollViews to prevent conflicts
-and ensure proper event flow.
+.. versionadded:: 3.0.0
 
-Requirements:
-- The outer ScrollView's viewport MUST be a Layout widget (BoxLayout, GridLayout,
-  FloatLayout, etc.). Non-Layout widgets (Label, Image, Button) will raise TypeError.
+The :class:`NestedScrollViewManager` widget provides coordination for nested 
+:class:`~kivy.uix.scrollview.ScrollView` configurations. It manages touch event 
+routing between outer and inner ScrollViews to provide intuitive scrolling 
+behavior in nested scenarios.
 
-Key Design Decisions:
-1. Touch Management: controls touch routing between outer and inner ScrollViews
-2. State Tracking: Uses touch.ud keys to track nested scroll state
-3. Touch Router Pattern: Centralizes all touch handling logic
-4. Orthogonal Delegation: Uses sv.handled axis tracking for automatic delegation
 
-Mouse wheel scrolling behavior: 
-- For orthogonal ScrollViews Mouse wheel scrolling is handled by the scrollview
-  that matches the direction of the scroll wheel.
-- For parallel ScrollViews Mouse wheel scrolling is handled by the scrollview
-  the mouse is touching.  Scrolling is not propagated to the other scrollview.
+Usage Requirements
+------------------
 
-Content Touch scrolling behavior:
-- For orthogonal ScrollViews Touch scrolling is handled by the scrollview
-  that matches the direction of the touch.
-- For parallel ScrollViews Touch scrolling is handled by the scrollview
-  that is touched.  When scrolling the inner scrollview 
-  hits its boundary the scroll is propagated to the outer scrollview.
+The NestedScrollViewManager supports two levels of scrolling: one outer 
+ScrollView and one or more inner ScrollViews. The outer ScrollView must be 
+the direct child of the NestedScrollViewManager. 
 
-Scrollbar scrolling behavior:
-- For parallel scrollviwes the inner scrollbar does not propagate scroll to the outer scrollview.
-"""
+In KV, it will look something like this:
 
-# TODO: clean up code/implementation comments.
-# TODO: Create documentation for the NestedScrollViewManager.
+NestedScrollViewManager:
+    ScrollView:  # the outer scrollview
+        ...attributes and layout
+        ...
+        ...ScrollView:  # one or more scrollviews deeper in the widget tree
+
+
+Nested Scrolling Behavior
+-------------------------
+
+The NestedScrollViewManager automatically detects the scrolling configuration 
+and applies appropriate behavior:
+
+**Orthogonal Scrolling** (outer and inner scroll in different directions):
+    - Touch scrolling: Each ScrollView handles touches in its scroll direction
+    - Mouse wheel: Scrolls the ScrollView matching the wheel direction
+    - Example: Vertical outer + Horizontal inner
+
+**Parallel Scrolling** (outer and inner scroll in the same direction):
+    - Touch scrolling: Uses web-style boundary delegation (see below)
+    - Mouse wheel: Scrolls only the ScrollView under the mouse cursor
+    - Scrollbar: Does not propagate scroll to the other ScrollView
+    - Example: Vertical outer + Vertical inner
+
+**Mixed Scrolling** (outer scrolls XY, inner scrolls single axis, or vice versa):
+    - Shared axis: Uses web-style boundary delegation
+    - Exclusive axes: Immediate delegation or inner-only scrolling
+    - Mouse wheel: Routes based on axis configuration
+    - Example: XY outer + Horizontal inner
+
+
+Web-Style Boundary Delegation
+------------------------------
+
+For parallel and shared-axis scrolling, the manager implements web-style 
+delegation behavior:
+
+    - Touch starts at inner boundary, moves away → delegates to outer immediately
+    - Touch starts at inner boundary, moves inward → scrolls inner only
+    - Touch starts not at boundary → scrolls inner only, never delegates 
+      (even when reaching boundary mid-gesture)
+    - New touch required at boundary to delegate to outer
+
+This behavior can be disabled by setting :attr:`parallel_delegation` to False.
+
+
+Python Example (Orthogonal Nesting)::
+-------------------------------------
+
+    from kivy.app import App
+    from kivy.uix.boxlayout import BoxLayout
+    from kivy.uix.button import Button
+    from kivy.uix.scrollview import ScrollView
+    from nested_scrollview_manager import NestedScrollViewManager
+
+
+    class NestedScrollApp(App):
+        def build(self):
+            # Create the NestedScrollViewManager (parent of outer ScrollView)
+            manager = NestedScrollViewManager()
+            
+            # Create outer vertical ScrollView
+            outer_sv = ScrollView(
+                do_scroll_x=False,
+                do_scroll_y=True,
+                smooth_scroll_end=10,
+                bar_width='10dp',
+                scroll_type=['bars', 'content']
+            )
+            
+            # Outer content layout (MUST be a Layout widget)
+            outer_layout = BoxLayout(
+                orientation='vertical',
+                size_hint_y=None,
+                spacing=20
+            )
+            outer_layout.bind(minimum_height=outer_layout.setter('height'))
+            
+            # Add several horizontal ScrollViews
+            for i in range(5):
+                # Create nested horizontal ScrollView
+                inner_sv = ScrollView(
+                    do_scroll_x=True,
+                    do_scroll_y=False,
+                    size_hint_y=None,
+                    height=120,
+                    smooth_scroll_end=10,
+                    bar_width='10dp',
+                    scroll_type=['bars', 'content']
+                )
+                
+                # Inner content layout
+                inner_layout = BoxLayout(
+                    orientation='horizontal',
+                    size_hint_x=None,
+                    spacing=10
+                )
+                inner_layout.bind(minimum_width=inner_layout.setter('width'))
+                
+                # Add horizontal scrolling buttons
+                for j in range(10):
+                    btn = Button(
+                        text=f'Button {i}-{j}',
+                        size_hint_x=None,
+                        width=100,
+                        height=80
+                    )
+                    inner_layout.add_widget(btn)
+                
+                # Assemble inner ScrollView
+                inner_sv.add_widget(inner_layout)
+                outer_layout.add_widget(inner_sv)
+            
+            # Assemble the nested structure
+            outer_sv.add_widget(outer_layout)
+            manager.add_widget(outer_sv)
+            
+            return manager
+
+
+    if __name__ == '__main__':
+        NestedScrollApp().run()
+
+
+KV Example (Orthogonal Nesting)
+------------------------------
+
+    from kivy.app import App
+    from kivy.lang import Builder
+    from kivy.uix.button import Button
+    from kivy.uix.scrollview import ScrollView
+    from kivy.properties import NumericProperty
+
+    KV = """
+    <HorizontalScrollRow>:
+        do_scroll_x: True
+        do_scroll_y: False
+        size_hint_y: None
+        height: 120
+        smooth_scroll_end: 10
+        bar_width: '10dp'
+        scroll_type: ['bars', 'content']
+        
+        BoxLayout:
+            id: content_layout
+            orientation: 'horizontal'
+            size_hint_x: None
+            size: self.minimum_width, dp(80)
+            spacing: 10
+
+    NestedScrollViewManager:
+        ScrollView:
+            id: outer_scroll
+            do_scroll_x: False
+            do_scroll_y: True
+            smooth_scroll_end: 10
+            bar_width: '10dp'
+            scroll_type: ['bars', 'content']
+            
+            BoxLayout:
+                id: outer_layout
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: 20
+    """
+
+    class HorizontalScrollRow(ScrollView):
+        row_number = NumericProperty(0)
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            for i in range(10):
+                btn = Button(
+                    text=f'Button {self.row_number}-{i}',
+                    size_hint_x=None,
+                    width='100dp'
+                )
+                self.ids.content_layout.add_widget(btn)
+
+
+    class NestedScrollKVApp(App):
+        def build(self):
+            return Builder.load_string(KV)
+            
+        def on_start(self):
+            # Dynamically create 5 horizontal ScrollViews with buttons
+            for i in range(10):
+                # Create a horizontal ScrollView using the KV rule
+                h_scroll = HorizontalScrollRow(row_number=i)
+                # Get the content layout
+                self.root.ids.outer_layout.add_widget(h_scroll)
+            
+
+    if __name__ == '__main__':
+        NestedScrollKVApp().run()
+
+
+Properties
+----------
+
+.. attribute:: parallel_delegation
+
+    Controls boundary delegation behavior for parallel nested ScrollViews.
+    
+    When True (default, web-style):
+        - Touch starting at inner boundary, moving away from boundary → 
+          delegates to outer ScrollView
+        - Touch starting not at boundary → scrolls inner only, never delegates
+    
+    When False:
+        - No delegation, only touched ScrollView scrolls
+        - Inner ScrollView shows overscroll effects at boundaries
+        - Touch stays with initially touched ScrollView for entire gesture
+    
+    :attr:`parallel_delegation` is a :class:`~kivy.properties.BooleanProperty` 
+    and defaults to True.
+
+'''
+
 # TODO: create a test suite for the updated ScrollView & NSVM for the kivy test suite.
 # TODO: Register the NestedScrollViewManager with kv.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
@@ -48,81 +253,26 @@ from updated_sv import ScrollView
 
 
 class NestedScrollViewManager(RelativeLayout):
-    """
-    Centralized touch routing coordinator for nested ScrollViews.
+    '''Touch routing coordinator for nested ScrollViews.
     
-    This manager intercepts touch events and routes them appropriately between
-    outer and inner ScrollViews, preventing conflicts and ensuring proper
-    event flow in nested scrolling scenarios.
+    See module documentation for detailed usage examples and behavior descriptions.
     
-    Requirements:
-        - The outer ScrollView's viewport must be a Layout widget (BoxLayout,
-          GridLayout, FloatLayout, etc.) that has a 'children' attribute.
-        - Non-Layout widgets (Label, Image, Button, etc.) cannot be used as
-          the viewport for nested scrolling.
-    
-    Raises:
-        TypeError: If the outer ScrollView's viewport is not a Layout widget
-                   (raised on first touch event).
-    
-    Example (Python):
-        # Correct usage
-        manager = NestedScrollViewManager()
-        outer_sv = ScrollView()
-        layout = BoxLayout(orientation='vertical')  # Layout widget
-        outer_sv.add_widget(layout)
-        manager.add_widget(outer_sv)
-        
-        # Incorrect usage (will raise TypeError on touch)
-        manager = NestedScrollViewManager()
-        outer_sv = ScrollView()
-        outer_sv.add_widget(Label(text="Error"))  # Not a Layout!
-        manager.add_widget(outer_sv)
-    
-    Example (KV Language):
-        # Correct usage
-        NestedScrollViewManager:
-            ScrollView:
-                do_scroll_y: True
-                do_scroll_x: False
-                BoxLayout:  # Layout widget - required!
-                    orientation: 'vertical'
-                    size_hint_y: None
-                    height: self.minimum_height
-                    
-                    ScrollView:
-                        do_scroll_y: False
-                        do_scroll_x: True
-                        size_hint_y: None
-                        height: 100
-                        GridLayout:
-                            cols: 10
-                            size_hint_x: None
-                            width: self.minimum_width
-                            # inner content here
-        
-        # Incorrect usage (will raise TypeError on touch)
-        NestedScrollViewManager:
-            ScrollView:
-                Label:  # Error! Not a Layout widget
-                    text: 'This will fail on touch'
-    """
+    .. versionadded:: 3.0.0
+    '''
 
     parallel_delegation = BooleanProperty(True)
-    """
-    Controls boundary delegation for parallel nested ScrollViews.
+    '''Controls boundary delegation behavior for parallel nested ScrollViews.
     
     When True (default, web-style):
-    - Touch starting at inner boundary, moving away from boundary → delegates to outer scrollview
-    - else → scrolls inner only, never delegates
+        - Touch starting at inner boundary, moving away → delegates to outer
+        - Touch starting not at boundary → scrolls inner only, never delegates
     
     When False:
-    - No delegation, only touched scrollview scrolls
-    - Inner scrollview shows overscroll effects at boundaries
-    - Touch stays with initially touched scrollview for entire gesture
+        - No delegation, only touched ScrollView scrolls
     
-    Default: True (web-style)
-    """
+    :attr:`parallel_delegation` is a :class:`~kivy.properties.BooleanProperty`
+    and defaults to True.
+    '''
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -131,17 +281,15 @@ class NestedScrollViewManager(RelativeLayout):
         self._current_touch = None
     
     def _with_transform(self, touch, scrollview, callback):
-        """
-        Execute a callback with touch transformed to scrollview's coordinate space.
+        # Execute a callback with touch transformed to scrollview's coordinate space.
         
-        Args:
-            touch: The touch event to transform
-            scrollview: The ScrollView whose coordinate space to transform to
-            callback: Function to call with transformed touch
+        # Args:
+        #     touch: The touch event to transform
+        #     scrollview: The ScrollView whose coordinate space to transform to
+        #     callback: Function to call with transformed touch
             
-        Returns:
-            The result of the callback
-        """
+        # Returns:
+        #     The result of the callback
         touch.push()
         touch.apply_transform_2d(scrollview.parent.to_widget)
         try:
@@ -151,29 +299,29 @@ class NestedScrollViewManager(RelativeLayout):
         return result
     
     def _delegate_to_scrollview_children(self, touch, scrollview, method_name='on_touch_move'):
-        """
-        Delegate touch event to ScrollView's children in correct coordinate space.
+        # Delegate touch event to ScrollView's children in correct coordinate space.
         
-        Args:
-            touch: The touch event
-            scrollview: The ScrollView whose children to delegate to
-            method_name: The method name to call (default: 'on_touch_move')
-            
-        Returns:
-            Result from _delegate_to_children
-        """
+        # Args:
+        #     touch: The touch event
+        #     scrollview: The ScrollView whose children to delegate to
+        #     method_name: The method name to call (default: 'on_touch_move')
+        
+        # Returns:
+        #     Result from _delegate_to_children
         return self._with_transform(
             touch, scrollview,
             lambda t: scrollview._delegate_to_children(t, method_name)
         )
 
     def _find_colliding_inner_scrollview(self, touch):
-        """
-        Find the first ScrollView that collides with the touch position.
+        # Find the first ScrollView that collides with the touch position.
+        #
+        # Args:
+        #     touch: The touch event
+        #
+        # Returns:
+        #     The first ScrollView that collides with the touch position
         
-        Optimized to check direct children first and only walk subtrees
-        that collide with the touch point, avoiding unnecessary tree traversal.
-        """
         viewport = self.outer_scrollview._viewport
         
         # Validate that viewport contains children (is a Layout)
@@ -286,7 +434,7 @@ class NestedScrollViewManager(RelativeLayout):
                     'shared': shared,
                     'outer_exclusive': outer_exclusive,
                     'inner_exclusive': inner_exclusive
-                }
+        }
 
         touch.push()
         touch.apply_transform_2d(outer_scrollview.parent.to_widget)
@@ -366,7 +514,7 @@ class NestedScrollViewManager(RelativeLayout):
                             return True
                     touch.pop()
                     return False
-                
+
                 elif target_scrollview:
                     # Direct routing to specific scrollview
                     touch.pop()
@@ -607,7 +755,7 @@ class NestedScrollViewManager(RelativeLayout):
                     del touch.ud[uid]
 
         # Always delegate to children after cleanup
-        # This ensures buttons/widgets get their on_touch_up even if gesture became a scroll
+            # This ensures buttons/widgets get their on_touch_up even if gesture became a scroll
         # Critical for preventing stuck button states and for touches not managed by this manager
         return super().on_touch_up(touch)
 

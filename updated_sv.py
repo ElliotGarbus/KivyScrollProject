@@ -189,11 +189,16 @@ class ScrollView(StencilView):
 
     :Events:
         `on_scroll_start`
-            Generic event fired when scrolling starts from touch.
+            Distpatch when scrolling is detected. 
         `on_scroll_move`
-            Generic event fired when scrolling move from touch.
+            Dispatched when scrolling continues. Fires continuously during scrolling.
         `on_scroll_stop`
-            Generic event fired when scrolling stops from touch.
+            Dispatched when scrolling stops. Fires when both velocity reaches zero and 
+            scroll position stabilizes for 3 consecutive frames.
+
+    .. versionchanged:: 3.0.0
+        `on_scroll_start`, `on_scroll_move` and `on_scroll_stop` events are
+        now dispatched for nested and non-nested ScrollViews.
 
     .. versionchanged:: 1.9.0
         `on_scroll_start`, `on_scroll_move` and `on_scroll_stop` events are
@@ -1871,7 +1876,7 @@ class ScrollView(StencilView):
         the scrollbar is initially grabbed. For mouse wheel scrolling, it fires
         on the first scroll wheel event.
         
-        .. versionchanged:: NEXT_VERSION
+        .. versionchanged:: 3.0.0
             Removed touch parameter. Use on_touch_down/move/up for touch-specific
             handling.
         '''
@@ -1889,7 +1894,7 @@ class ScrollView(StencilView):
         implementing scroll-based animations, progress indicators, or parallax
         effects.
         
-        .. versionchanged:: NEXT_VERSION
+        .. versionchanged:: 3.0.0
             Removed touch parameter. Use on_touch_down/move/up for touch-specific
             handling. Now fires for all scroll_x/scroll_y changes including
             programmatic updates.
@@ -1907,7 +1912,7 @@ class ScrollView(StencilView):
         such as loading more content, snapping to grid positions, or updating
         UI state.
         
-        .. versionchanged:: NEXT_VERSION
+        .. versionchanged:: 3.0.0
             Removed touch parameter. Use on_touch_down/move/up for touch-specific
             handling. Improved detection to use hybrid velocity/position checking
             for more reliable stop detection across all scroll effects.
