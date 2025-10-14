@@ -55,11 +55,10 @@ to the inner and outer scrollview.
 Things worked nicely, but I have decided to integrate the capabilities back into ScrollView, 
 rather than have two separate widgets.
 
- - nested_scrollview_manager.py - The NestedScrollViewManager
- - updated_sv.py - ScrollView simplified and adapted to work with the NestedScrollViewManager
+ - updated_sv_no_manager.py - ScrollView with Nesting support
 
-Demonstrations/tests using the updated scrollview:
-- demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) using the NestedScrollViewManager
+Demonstrations/tests using the updated ScrollView: (NEED TO BE UPDATED - Delete manager)
+- demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) 
 - demo_nested_horizontal.py - Horizontal parallel ScrollViews 
 - demo_nested_vertical.py - Multiple vertical parallel ScrollViews
 - demo_nested_xy.py - XY ScrollViews nested in an XY ScrollView
@@ -76,14 +75,6 @@ Demonstrations/tests using the updated scrollview:
 - demo_scroll_events_non_neseted.py - tool for observing scroll event firing (start, move, stop) within a single, non-nested ScrollView
 - demo_scroll_events_nested.py - color-coded scroll events for nested vertical and horizontal ScrollViews; in nested scenarios.
 
-- demo_drag_over_scroll.py - Dragging a button over a single ScrollView
 - demo_drag_from_scroll.py - Dragging buttons out of a single ScrollView
 - demo_drag_nested_scroll.py - Dragging buttons out of nested orthogonal ScrollViews 
 
-Other Files:
-- check_svavoid_coordination.py - explore the role of the 'svavoid' metadata in ScrollView and DragBehavior
-- og_nested_verticals.py - demonstrates the kivy v2.31 nesting.  Only parallel nesting is supported, has artifacts.
-- my_scrollview.py - attempt to support nesting with minor modificaitons to the original ScrollView. (Abandoned)
-
-
- The NestedScrollViewManger is not registered.  Register if you want to use with kv.
