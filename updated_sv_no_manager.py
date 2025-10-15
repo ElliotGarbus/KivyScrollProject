@@ -1675,6 +1675,50 @@ class ScrollView(StencilView):
             return True  # Delegate to outer
         
         return False  # Inner continues handling
+    
+    def _handle_focus_behavior(self, touch, uid_key):
+        # Handle focus behavior after scroll finalization.
+        # 
+        # If the touch caused scrolling (can_defocus=False), add it to the
+        # ignored list so focused widgets don't get defocused by this touch.
+        # 
+        # Args:
+        #     touch: The touch event
+        #     uid_key: The unique key for this ScrollView's touch data
+        
+        if uid_key in touch.ud and not touch.ud[uid_key].get('can_defocus', True):
+            FocusBehavior.ignored_touch.append(touch)
+    
+    def _finalize_nested_inner(self, touch, inner):
+        # Finalize inner ScrollView after touch release in nested setup.
+        # 
+        # Calls inner's finalization with proper coordinate transformation
+        # and handles focus behavior.
+        # 
+        # Args:
+        #     touch: The touch event
+        #     inner: The inner ScrollView to finalize
+        
+        inner_uid = inner._get_uid()
+        if inner_uid in touch.ud:
+            # Transform touch to inner's parent coordinate space
+            touch.push()
+            touch.apply_transform_2d(inner.parent.to_widget)
+            inner._scroll_finalize(touch)
+            touch.pop()
+            self._handle_focus_behavior(touch, inner_uid)
+    
+    def _finalize_nested_outer(self, touch):
+        # Finalize outer ScrollView after touch release in nested setup.
+        # 
+        # Calls finalization and handles focus behavior.
+        # 
+        # Args:
+        #     touch: The touch event
+        
+        self._scroll_finalize(touch)
+        uid_key = self._get_uid()
+        self._handle_focus_behavior(touch, uid_key)
 
     def _scroll_initialize(self, touch):
         # This is the first phase of the scroll gesture, call from on_touch_down
@@ -1858,69 +1902,47 @@ class ScrollView(StencilView):
         # ===================================================
         # Handles touch release for both standalone and nested configurations.
         
-        # Check if we're coordinating a nested touch as the outer ScrollView
+        # NESTED COORDINATION: Check if we're the outer ScrollView
         nested_data = touch.ud.get('nested')
         if nested_data and nested_data.get('outer') == self:
-            # We're the OUTER ScrollView - finalize whoever was handling
             mode = nested_data.get('mode')
+            inner = nested_data.get('inner')
             
-            if mode == 'inner':
-                # Inner was handling - finalize inner WITH COORDINATE TRANSFORMATION
-                inner = nested_data.get('inner')
-                if inner:
-                    inner_uid = inner._get_uid()
-                    if inner_uid in touch.ud:
-                        # Transform touch to inner's parent coordinate space (like in on_touch_down/move)
-                        touch.push()
-                        touch.apply_transform_2d(inner.parent.to_widget)
-                        inner._scroll_finalize(touch)
-                        touch.pop()
-                        if not touch.ud[inner_uid].get('can_defocus', True):
-                            FocusBehavior.ignored_touch.append(touch)
+            # Finalize whichever ScrollView was handling the gesture
+            if mode == 'inner' and inner:
+                self._finalize_nested_inner(touch, inner)
             elif mode == 'outer':
-                # Outer was handling - finalize outer
-                self._scroll_finalize(touch)
-                uid_key = self._get_uid()
-                if uid_key in touch.ud and not touch.ud[uid_key].get('can_defocus', True):
-                    FocusBehavior.ignored_touch.append(touch)
+                self._finalize_nested_outer(touch)
             
-            # Release grab
+            # Release grab and return
             if touch.grab_current is self:
                 touch.ungrab(self)
             return True
         
-        # CASE 1: This ScrollView has state for this touch (previously handled it)
-        # Even if self._touch is None now, we need to clean up properly
+        # STANDALONE: Handle touch release
         uid_key = self._get_uid()
+        
+        # Touch was handled by this ScrollView
         if uid_key in touch.ud:
-            # Deliver scroll stop event and clean up grab ownership
             self._scroll_finalize(touch)
             
-            # Double-check grab ownership after on_scroll_stop handlers run
-            # Some handlers might have already released the grab
+            # Release grab if we still have it (handlers may have released it)
             gl = touch.grab_list or []
             if any(w() is self for w in gl):
                 touch.ungrab(self)
-                
-            # Handle focus behavior - if touch caused scrolling, prevent defocus
-            if not touch.ud[uid_key].get('can_defocus', True):
-                FocusBehavior.ignored_touch.append(touch)
+            
+            self._handle_focus_behavior(touch, uid_key)
             return True
-
-        # CASE 2: This ScrollView is not handling this touch
-        # example,  if a button in the ScrollView is pressed, 
-        # we need to pass the touch up event to children
+        
+        # Touch not handled by us - delegate to children
         uid = self._get_uid('svavoid')
         if self._touch is not touch and uid not in touch.ud:
             return self._delegate_to_children(touch, 'on_touch_up')
-
-        # CASE 3: Normal scroll stop handling
-        # This ScrollView is actively handling this touch
+        
+        # Final fallback: finalize and ungrab
         if self._scroll_finalize(touch):
             touch.ungrab(self)
-            if not touch.ud[uid_key].get('can_defocus', True):
-                # Touch caused scrolling - prevent focused widget defocus
-                FocusBehavior.ignored_touch.append(touch)
+            self._handle_focus_behavior(touch, uid_key)
             return True
 
     def _scroll_finalize(self, touch):
