@@ -876,6 +876,112 @@ class ScrollView(StencilView):
                     return widget
         touch.pop()
         return None
+    
+    def _classify_nested_configuration(self, child_sv):
+        # Classify the nested ScrollView configuration type.
+        # 
+        # Determines if the outer/inner relationship is:
+        # - Orthogonal: Different axes (e.g., outer=vertical, inner=horizontal)
+        # - Parallel: Same axes (e.g., both vertical)
+        # - Mixed: Combination (e.g., outer=xy, inner=vertical)
+        # 
+        # Args:
+        #     child_sv: The inner ScrollView
+        # 
+        # Returns:
+        #     dict or None: If mixed, returns axis_config dict with 'shared',
+        #                   'outer_exclusive', and 'inner_exclusive' lists.
+        #                   If not mixed, returns None.
+        
+        outer_axes = (self.do_scroll_x, self.do_scroll_y)
+        inner_axes = (child_sv.do_scroll_x, child_sv.do_scroll_y)
+        
+        is_orthogonal = (outer_axes[0] != inner_axes[0] and 
+                       outer_axes[1] != inner_axes[1] and 
+                       (outer_axes[0] or outer_axes[1]) and 
+                       (inner_axes[0] or inner_axes[1]))
+        is_parallel = (outer_axes == inner_axes)
+        is_mixed = not is_orthogonal and not is_parallel
+        
+        if not is_mixed:
+            return None
+        
+        # For mixed configurations, determine axis capabilities
+        shared = []
+        outer_exclusive = []
+        inner_exclusive = []
+        
+        # Check X axis
+        if outer_axes[0] and inner_axes[0]:
+            shared.append('x')
+        elif outer_axes[0] and not inner_axes[0]:
+            outer_exclusive.append('x')
+        elif not outer_axes[0] and inner_axes[0]:
+            inner_exclusive.append('x')
+        
+        # Check Y axis
+        if outer_axes[1] and inner_axes[1]:
+            shared.append('y')
+        elif outer_axes[1] and not inner_axes[1]:
+            outer_exclusive.append('y')
+        elif not outer_axes[1] and inner_axes[1]:
+            inner_exclusive.append('y')
+        
+        return {
+            'shared': shared,
+            'outer_exclusive': outer_exclusive,
+            'inner_exclusive': inner_exclusive
+        }
+    
+    def _initialize_nested_inner(self, touch, child_sv):
+        # Initialize scrolling on the inner ScrollView with proper coordinate transformation.
+        # 
+        # Handles both regular touch and mouse wheel events. For mouse wheel events that
+        # are rejected by the inner (orthogonal direction), attempts to initialize the
+        # outer ScrollView instead.
+        # 
+        # Args:
+        #     touch: The touch/mouse event
+        #     child_sv: The inner ScrollView to initialize
+        # 
+        # Returns:
+        #     bool: True if scrolling was successfully initialized (inner or outer),
+        #           False if both rejected the touch
+        
+        is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
+        
+        # Transform touch to inner's PARENT coordinate space
+        # (NOT viewport, NOT window - the parent widget that contains the inner)
+        print(f"  Outer calling child_sv._scroll_initialize() - transforming to child's parent space")
+        print(f"  Touch in window space: {touch.pos}")
+        touch.push()
+        touch.apply_transform_2d(child_sv.parent.to_widget)
+        print(f"  Touch in child's parent space: {touch.pos}")
+        result = child_sv._scroll_initialize(touch)
+        touch.pop()
+        print(f"  Child _scroll_initialize result: {result}")
+        
+        if result:
+            # Inner accepted scrolling
+            # For MOUSE WHEEL: Don't grab or set _touch (each wheel event is independent)
+            # For REGULAR TOUCH: Outer grabs, inner's _touch is set for coordination
+            if not is_wheel:
+                # Regular touch: outer grabs, inner tracks the touch
+                touch.grab(self)
+                child_sv._touch = touch
+            # Wheel events are handled immediately, no grab/touch tracking needed
+            return True
+        
+        # Inner rejected the touch
+        # For MOUSE WHEEL in orthogonal setups, try outer ScrollView
+        if is_wheel:
+            print(f"  Inner rejected wheel - trying outer")
+            # Try outer with ORIGINAL touch (already popped above)
+            touch.ud['nested']['mode'] = 'outer'  # Update mode for tracking
+            if self._scroll_initialize(touch):
+                return True
+        
+        return False
             
 
 
@@ -885,16 +991,8 @@ class ScrollView(StencilView):
         # This method automatically detects nested ScrollView configurations and
         # sets up coordination. 
         
-        print(f"\n[on_touch_down ENTRY] {id(self)}: touch.pos={touch.pos}")
-        print(f"  self.pos={self.pos}, self.size={self.size}")
-        print(f"  collide_point result={self.collide_point(*touch.pos)}")
-        
         if not self.collide_point(*touch.pos):
-            print(f"  No collision - returning False immediately")
             return False
-        
-        print(f"\n[on_touch_down] {id(self)}: touch.pos={touch.pos}")
-        print(f"  'nested' in touch.ud={('nested' in touch.ud)}")
         
         # NESTED DETECTION via touch event flow:
         # Parent widgets receive touches BEFORE children in Kivy.
@@ -935,79 +1033,13 @@ class ScrollView(StencilView):
                 'delegation_mode': 'unknown'  # Will be set in _scroll_initialize
             }
             
-            # Classify nested configuration for mixed case handling
-            outer_axes = (self.do_scroll_x, self.do_scroll_y)
-            inner_axes = (child_sv.do_scroll_x, child_sv.do_scroll_y)
+            # Classify nested configuration and store axis info if mixed
+            axis_config = self._classify_nested_configuration(child_sv)
+            if axis_config:
+                touch.ud['nested']['axis_config'] = axis_config
             
-            is_orthogonal = (outer_axes[0] != inner_axes[0] and 
-                           outer_axes[1] != inner_axes[1] and 
-                           (outer_axes[0] or outer_axes[1]) and 
-                           (inner_axes[0] or inner_axes[1]))
-            is_parallel = (outer_axes == inner_axes)
-            is_mixed = not is_orthogonal and not is_parallel
-            
-            if is_mixed:
-                # Determine axis capabilities for mixed configurations
-                shared = []
-                outer_exclusive = []
-                inner_exclusive = []
-                
-                # Check X axis
-                if outer_axes[0] and inner_axes[0]:
-                    shared.append('x')
-                elif outer_axes[0] and not inner_axes[0]:
-                    outer_exclusive.append('x')
-                elif not outer_axes[0] and inner_axes[0]:
-                    inner_exclusive.append('x')
-                
-                # Check Y axis
-                if outer_axes[1] and inner_axes[1]:
-                    shared.append('y')
-                elif outer_axes[1] and not inner_axes[1]:
-                    outer_exclusive.append('y')
-                elif not outer_axes[1] and inner_axes[1]:
-                    inner_exclusive.append('y')
-                
-                # Store compact axis configuration
-                touch.ud['nested']['axis_config'] = {
-                    'shared': shared,
-                    'outer_exclusive': outer_exclusive,
-                    'inner_exclusive': inner_exclusive
-                }
-            
-            # Now initialize scrolling on the inner child
-            # KEY INSIGHT FROM WORKING CODE: Transform to inner's PARENT coordinate space
-            # (NOT viewport, NOT window - the parent widget that contains the inner)
-            print(f"  Outer calling child_sv._scroll_initialize() - transforming to child's parent space")
-            print(f"  Touch in window space: {touch.pos}")
-            touch.push()
-            touch.apply_transform_2d(child_sv.parent.to_widget)
-            print(f"  Touch in child's parent space: {touch.pos}")
-            result = child_sv._scroll_initialize(touch)
-            touch.pop()
-            print(f"  Child _scroll_initialize result: {result}")
-            if result:
-                # Inner accepted scrolling
-                # For MOUSE WHEEL: Don't grab or set _touch (each wheel event is independent)
-                # For REGULAR TOUCH: Outer grabs, inner's _touch is set for coordination
-                is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
-                if not is_wheel:
-                    # Regular touch: outer grabs, inner tracks the touch
-                    touch.grab(self)
-                    child_sv._touch = touch
-                # Wheel events are handled immediately, no grab/touch tracking needed
-                return True
-            
-            # Inner rejected the touch
-            # For MOUSE WHEEL in orthogonal setups, try outer ScrollView
-            is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
-            if is_wheel:
-                print(f"  Inner rejected wheel - trying outer")
-                # Try outer with ORIGINAL touch (already popped above)
-                touch.ud['nested']['mode'] = 'outer'  # Update mode for tracking
-                if self._scroll_initialize(touch):
-                    return True
-            return False
+            # Initialize scrolling on the inner child (handles coordinate transformation)
+            return self._initialize_nested_inner(touch, child_sv)
         
         # We're STANDALONE - no parent, no child
         if self._scroll_initialize(touch):
