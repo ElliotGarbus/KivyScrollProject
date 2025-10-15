@@ -10,8 +10,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.metrics import dp
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 
 class NestedXYMixedDemo(App):
@@ -30,8 +29,6 @@ class NestedXYMixedDemo(App):
     
     def _create_xy_horizontal_panel(self):
         """Create XY outer with Horizontal inner scrollviews"""
-        nsvm = NestedScrollViewManager()
-        
         # Outer ScrollView: XY (both axes)
         outer_sv = ScrollView(
             do_scroll_x=True,
@@ -113,14 +110,11 @@ class NestedXYMixedDemo(App):
             outer_container.add_widget(inner_sv)
         
         outer_sv.add_widget(outer_container)
-        nsvm.add_widget(outer_sv)
         
-        return nsvm
+        return outer_sv
     
     def _create_xy_vertical_panel(self):
         """Create XY outer with Vertical inner scrollviews"""
-        nsvm = NestedScrollViewManager()
-        
         # Outer ScrollView: XY (both axes)
         outer_sv = ScrollView(
             do_scroll_x=True,
@@ -213,9 +207,8 @@ class NestedXYMixedDemo(App):
         main_container.add_widget(columns_container)
         
         outer_sv.add_widget(main_container)
-        nsvm.add_widget(outer_sv)
         
-        return nsvm
+        return outer_sv
 
 
 if __name__ == '__main__':

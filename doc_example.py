@@ -4,22 +4,18 @@ Simple example of nested orthogonal ScrollViews for documentation.
 This example demonstrates:
 - Vertical outer ScrollView
 - Horizontal inner ScrollViews
-- Proper use of NestedScrollViewManager
+- Direct nesting of ScrollViews without manager
 - Layout requirements for nested scrolling
 """
 
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 
 class NestedScrollApp(App):
     def build(self):
-        # Create the NestedScrollViewManager (parent of outer ScrollView)
-        manager = NestedScrollViewManager()
-        
         # Create outer vertical ScrollView
         outer_sv = ScrollView(
             do_scroll_x=False,
@@ -74,9 +70,8 @@ class NestedScrollApp(App):
         
         # Assemble the nested structure
         outer_sv.add_widget(outer_layout)
-        manager.add_widget(outer_sv)
         
-        return manager
+        return outer_sv
 
 
 if __name__ == '__main__':

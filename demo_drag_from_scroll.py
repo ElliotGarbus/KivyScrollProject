@@ -23,7 +23,7 @@ from kivy.uix.behaviors import DragBehavior
 from kivy.properties import BooleanProperty, ListProperty
 from kivy.animation import Animation
 from kivy.clock import Clock
-from updated_sv import ScrollView
+from updated_sv_no_manager import ScrollView
 
 
 class DraggableButton(DragBehavior, Button):

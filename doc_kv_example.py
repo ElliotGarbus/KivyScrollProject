@@ -4,21 +4,17 @@ Hybrid KV/Python example of nested orthogonal ScrollViews for documentation.
 This example demonstrates:
 - KV rules defining widget templates
 - Python code dynamically creating content
-- Proper use of NestedScrollViewManager
+- Direct nesting of ScrollViews without manager
 - Realistic pattern for data-driven nested ScrollViews
 """
 
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.button import Button
-from updated_sv import ScrollView
+from updated_sv_no_manager import ScrollView
 from kivy.properties import NumericProperty
 
 from kivy.factory import Factory
-from nested_scrollview_manager import NestedScrollViewManager
-
-# Register custom widgets with Factory so KV can use them
-Factory.register('NestedScrollViewManager', cls=NestedScrollViewManager)
 
 # Unregister the original ScrollView and register our updated version
 Factory.unregister('ScrollView')
@@ -42,21 +38,20 @@ KV = '''
         size: self.minimum_width, dp(80)
         spacing: 10
 
-NestedScrollViewManager:
-    ScrollView:
-        id: outer_scroll
-        do_scroll_x: False
-        do_scroll_y: True
-        smooth_scroll_end: 10
-        bar_width: '10dp'
-        scroll_type: ['bars', 'content']
-        
-        BoxLayout:
-            id: outer_layout
-            orientation: 'vertical'
-            size_hint_y: None
-            height: self.minimum_height
-            spacing: 20
+ScrollView:
+    id: outer_scroll
+    do_scroll_x: False
+    do_scroll_y: True
+    smooth_scroll_end: 10
+    bar_width: '10dp'
+    scroll_type: ['bars', 'content']
+    
+    BoxLayout:
+        id: outer_layout
+        orientation: 'vertical'
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: 20
 '''
 
 class HorizontalScrollRow(ScrollView): # define the horizontal inner ScrollView

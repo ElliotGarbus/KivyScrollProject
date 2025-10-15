@@ -8,8 +8,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.metrics import dp
 
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 
 class InnerScrollView(ScrollView):
@@ -81,9 +80,6 @@ class InnerPanel(BoxLayout):
 
 class TestNestedHorizontalsApp(App):
     def build(self):
-        # Create NestedScrollViewManager
-        manager = NestedScrollViewManager()
-        
         # Outer ScrollView (horizontal)
         outer_scroll = ScrollView(
             do_scroll_x=True,  # Outer ScrollView also scrolls horizontally
@@ -130,10 +126,7 @@ class TestNestedHorizontalsApp(App):
 
         outer_scroll.add_widget(vertical_container)
         
-        # Add the outer ScrollView to the NestedScrollViewManager
-        manager.add_widget(outer_scroll)
-        
-        return manager
+        return outer_scroll
 
 
 if __name__ == "__main__":

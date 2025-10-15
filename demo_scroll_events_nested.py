@@ -17,8 +17,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 # ANSI color codes for terminal output
 class Colors:
@@ -54,10 +53,6 @@ class ScrollEventTestApp(App):
         )
         info_panel.add_widget(title)
         info_panel.add_widget(subtitle)
-        
-        # Create nested ScrollView setup using NestedScrollViewManager
-        # Pattern: Vertical outer + Horizontal inner (like left side of demo_nested_orthogonal)
-        manager = NestedScrollViewManager(size_hint=(1, 1))
         
         # Outer ScrollView (Vertical)
         self.outer_sv = ScrollView(
@@ -131,7 +126,6 @@ class ScrollEventTestApp(App):
             inner_sv.bind(on_scroll_stop=self.on_horizontal_scroll_stop)
         
         self.outer_sv.add_widget(outer_content)
-        manager.add_widget(self.outer_sv)
         
         # Bind scroll events for outer (vertical) ScrollView
         self.outer_sv.bind(on_scroll_start=self.on_vertical_scroll_start)
@@ -140,7 +134,7 @@ class ScrollEventTestApp(App):
         
         # Assemble the UI
         main_layout.add_widget(info_panel)
-        main_layout.add_widget(manager)
+        main_layout.add_widget(self.outer_sv)
         
         print(f"\n{Colors.BOLD}=== Scroll Event Test Started ==={Colors.RESET}\n")
         

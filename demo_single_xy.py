@@ -3,7 +3,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
 from kivy.metrics import dp
 
-from updated_sv import ScrollView
+from updated_sv_no_manager import ScrollView
 
 
 class XYDemo(App):

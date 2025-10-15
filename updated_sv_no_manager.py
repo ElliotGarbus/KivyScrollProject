@@ -201,6 +201,7 @@ from math import isclose
 from kivy.animation import Animation
 from kivy.config import Config
 from kivy.clock import Clock
+from kivy.core.window import Window
 from kivy.factory import Factory
 from kivy.graphics import PushMatrix, Translate, PopMatrix, Canvas
 from kivy.uix.stencilview import StencilView
@@ -622,11 +623,18 @@ class ScrollView(StencilView):
         # Walk up the widget tree to find the immediate parent ScrollView.
         # Returns the first ScrollView ancestor, or None if standalone.
         # Does NOT return grandparent or higher - only immediate parent.
-        for widget in self.walk_reverse(loopback=False):
-            if widget is self:
-                continue
+        # 
+        # IMPORTANT: Walk ONLY up the parent chain, not siblings!
+        widget = self.parent
+        while widget:
+            # Stop at Window level - no ScrollViews can be parents of Window
+            if widget.__class__.__name__ == 'WindowSDL' or isinstance(widget, type(Window)):
+                return None
+            
             if isinstance(widget, ScrollView):
                 return widget
+            
+            widget = widget.parent
         return None
 
     def _find_child_scrollview_at_touch(self, touch):
@@ -922,6 +930,16 @@ class ScrollView(StencilView):
         if parent_sv:
             return False  # Let parent handle coordination
         
+        # Check if touch is on OUR scrollbar - if so, handle it directly (don't look for children)
+        # This ensures outer scrollbar works even when there are inner ScrollViews
+        in_bar_x, in_bar_y = self._check_scroll_bounds(touch)
+        if in_bar_x or in_bar_y:
+            # Touch is on our scrollbar - handle it directly
+            if self._scroll_initialize(touch):
+                touch.grab(self)
+                return True
+            return False
+        
         # We might be the outer ScrollView - check for child at touch position
         child_sv = self._find_child_scrollview_at_touch(touch)
         
@@ -990,6 +1008,16 @@ class ScrollView(StencilView):
             if result:
                 touch.grab(self)  # Outer maintains grab ownership for coordination
                 return True
+            
+            # Inner rejected the touch - check if it's a mouse wheel that we (outer) can handle
+            if 'button' in touch.profile and touch.button.startswith('scroll'):
+                # Mouse wheel was rejected by inner (orthogonal direction)
+                # Try to handle it with outer
+                touch.ud['nested']['mode'] = 'outer'  # Update mode since outer is handling
+                if self._scroll_initialize(touch):
+                    touch.grab(self)
+                    return True
+            
             return False
         
         # We're STANDALONE - no parent, no child

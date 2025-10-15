@@ -9,7 +9,6 @@ Features:
 - Drag buttons from any row to the landing zone
 - Buttons that hit the landing zone are removed from their row
 - Buttons that miss return to their original position
-- Tests compatibility with NestedScrollViewManager
 """
 
 from kivy.app import App
@@ -24,8 +23,7 @@ from kivy.uix.behaviors import DragBehavior
 from kivy.properties import BooleanProperty, ListProperty
 from kivy.animation import Animation
 from kivy.clock import Clock
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 
 class DraggableButton(DragBehavior, Button):
@@ -229,9 +227,6 @@ class DragNestedScrollDemo(App):
         )
         nested_container.add_widget(nested_label)
         
-        # Create NestedScrollViewManager
-        manager = NestedScrollViewManager(size_hint=(1, 1))
-        
         # Outer ScrollView (Vertical)
         outer_sv = ScrollView(
             do_scroll_x=False,
@@ -310,8 +305,7 @@ class DragNestedScrollDemo(App):
             outer_content.add_widget(row_container)
         
         outer_sv.add_widget(outer_content)
-        manager.add_widget(outer_sv)
-        nested_container.add_widget(manager)
+        nested_container.add_widget(outer_sv)
         
         content_layout.add_widget(nested_container)
         

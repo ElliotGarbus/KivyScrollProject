@@ -13,8 +13,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.slider import Slider
 from kivy.metrics import dp
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 
 class NestedSliderDemo(App):
@@ -31,9 +30,6 @@ class NestedSliderDemo(App):
             height=60
         )
         main_layout.add_widget(title)
-        
-        # Create NestedScrollViewManager
-        manager = NestedScrollViewManager(size_hint=(1, 1))
         
         # Outer ScrollView (Vertical)
         outer_sv = ScrollView(
@@ -144,8 +140,7 @@ class NestedSliderDemo(App):
             outer_content.add_widget(inner_sv)
         
         outer_sv.add_widget(outer_content)
-        manager.add_widget(outer_sv)
-        main_layout.add_widget(manager)
+        main_layout.add_widget(outer_sv)
         
         return main_layout
 
