@@ -1,7 +1,7 @@
 """
 Interactive nested demo
-Demo showing the nested scroll manager in action.
-Test orthogonal nested scrollview
+Demo showing nested scrollviews without a manager.
+Test orthogonal nested scrollview (Vertical outer + Horizontal inner, Horizontal outer + Vertical inner)
 """
 
 from kivy.app import App
@@ -10,18 +10,14 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.metrics import dp
-from updated_sv import ScrollView
-from nested_scrollview_manager import NestedScrollViewManager
+from updated_sv_no_manager import ScrollView
 
 
 class NestedScrollViewDemo(App):
     def build(self):
         main_layout = BoxLayout(orientation='horizontal', spacing=10, padding=10)
-        nsvm_left = NestedScrollViewManager()
-        nsvm_right = NestedScrollViewManager()
-        main_layout.add_widget(nsvm_left)
-        main_layout.add_widget(nsvm_right)
 
+        # LEFT SIDE: Vertical outer with horizontal inner scrollviews
         left_vertical_sv = ScrollView(
             do_scroll_x=False,
             do_scroll_y=True,
@@ -74,7 +70,9 @@ class NestedScrollViewDemo(App):
             horizontal_sv.add_widget(horizontal_content)
             left_container.add_widget(horizontal_sv)
         left_vertical_sv.add_widget(left_container)
-        nsvm_left.add_widget(left_vertical_sv)
+        main_layout.add_widget(left_vertical_sv)
+
+        # RIGHT SIDE: Horizontal outer with vertical inner scrollviews
         right_horizontal_sv = ScrollView(
             do_scroll_x=True,
             do_scroll_y=False,
@@ -126,7 +124,8 @@ class NestedScrollViewDemo(App):
             vertical_sv.add_widget(vertical_content)
             right_container.add_widget(vertical_sv)
         right_horizontal_sv.add_widget(right_container)
-        nsvm_right.add_widget(right_horizontal_sv)
+        main_layout.add_widget(right_horizontal_sv)
+
         return main_layout
 
 
