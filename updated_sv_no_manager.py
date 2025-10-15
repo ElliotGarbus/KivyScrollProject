@@ -149,7 +149,7 @@ Nested ScrollViews
 Nested Scrolling Behavior
 -------------------------
 
-The NestedScrollViewManager automatically detects the scrolling configuration 
+The ScrollView automatically detects the scrolling configuration 
 and applies appropriate behavior:
 
 **Orthogonal Scrolling** (outer and inner scroll in different directions):
@@ -173,7 +173,7 @@ and applies appropriate behavior:
 Web-Style Boundary Delegation
 ------------------------------
 
-For parallel and shared-axis scrolling, the manager implements web-style 
+For parallel and shared-axis scrolling, the ScrollView implements web-style 
 delegation behavior:
 
     - Touch starts at inner boundary, moves away → delegates to outer immediately
@@ -185,9 +185,8 @@ delegation behavior:
 This behavior can be disabled by setting :attr:`parallel_delegation` to False.
 '''
 
-# TODO: Update demos to use the updated ScrollView, remove the manager.
+
 # TODO: update the implementation.
-# TODO: Update documentation to use the updated ScrollView, remove the manager.
 # TODO: Formalize the touch.ud, look at using ENUMs
 # TODO: create a test suite for the updated ScrollView for the kivy test suite.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
@@ -201,7 +200,6 @@ from math import isclose
 from kivy.animation import Animation
 from kivy.config import Config
 from kivy.clock import Clock
-from kivy.core.window import Window
 from kivy.factory import Factory
 from kivy.graphics import PushMatrix, Translate, PopMatrix, Canvas
 from kivy.uix.stencilview import StencilView
@@ -619,78 +617,6 @@ class ScrollView(StencilView):
 
     __events__ = ('on_scroll_start', 'on_scroll_move', 'on_scroll_stop')
 
-    def _find_parent_scrollview(self):
-        # Walk up the widget tree to find the immediate parent ScrollView.
-        # Returns the first ScrollView ancestor, or None if standalone.
-        # Does NOT return grandparent or higher - only immediate parent.
-        # 
-        # IMPORTANT: Walk ONLY up the parent chain, not siblings!
-        widget = self.parent
-        while widget:
-            # Stop at Window level - no ScrollViews can be parents of Window
-            if widget.__class__.__name__ == 'WindowSDL' or isinstance(widget, type(Window)):
-                return None
-            
-            if isinstance(widget, ScrollView):
-                return widget
-            
-            widget = widget.parent
-        return None
-
-    def _find_child_scrollview_at_touch(self, touch):
-        # Find the child ScrollView that collides with the touch position.
-        # 
-        # This replicates NestedScrollViewManager._find_colliding_inner_scrollview
-        # logic but operates directly within the outer ScrollView.
-        # 
-        # Returns:
-        #     ScrollView: The first child ScrollView that collides with touch, or None
-        
-        try:
-            viewport = self._viewport
-            
-            # Safety checks: viewport must exist and be a Layout with children
-            if not viewport:
-                return None
-            if not hasattr(viewport, 'children'):
-                return None
-            if not viewport.children:
-                return None
-            
-            # Transform touch to viewport space
-            touch.push()
-            touch.apply_transform_2d(viewport.to_widget)
-
-            # Iterate direct children first (collision check before subtree walk)
-            for child in viewport.children:
-                # Quick collision check - skip entire branch if touch isn't in it
-                if not child.collide_point(*touch.pos):
-                    continue
-
-                # Is this child itself a ScrollView?
-                if isinstance(child, ScrollView):
-                    touch.pop()
-                    return child
-
-                # Walk only this colliding child's subtree to find nested ScrollView
-                for widget in child.walk(restrict=True):
-                    if isinstance(widget, ScrollView) and widget.collide_point(*touch.pos):
-                        touch.pop()
-                        return widget
-
-            touch.pop()
-            return None
-            
-        except Exception as e:
-            print(f"ERROR in _find_child_scrollview_at_touch: {e}")
-            import traceback
-            traceback.print_exc()
-            # Make sure to pop if we pushed
-            try:
-                touch.pop()
-            except:
-                pass
-            return None
 
     def __init__(self, **kwargs):
         self._touch = None
@@ -912,11 +838,52 @@ class ScrollView(StencilView):
         touch.pop()
         return res
 
+    def _find_child_scrollview_at_touch(self, touch):
+        # Find the child ScrollView that collides with the touch position.
+        # 
+        # Returns:
+        #     ScrollView: The first child ScrollView that collides with touch, or None
+        
+        viewport = self._viewport
+        
+        # Safety checks: viewport must exist and be a Layout with children
+        if not viewport:
+            return None
+        if not hasattr(viewport, 'children'):
+            return None
+        if not viewport.children:
+            return None
+        
+        # Transform touch to viewport space
+        touch.push()
+        touch.apply_transform_2d(viewport.to_widget)
+
+        # Iterate direct children first (collision check before subtree walk)
+        for child in viewport.children:
+            # Quick collision check - skip entire branch if touch isn't in it
+            if not child.collide_point(*touch.pos):
+                continue
+
+            # Is this child itself a ScrollView?
+            if isinstance(child, ScrollView):
+                touch.pop()
+                return child
+
+            # Walk only this colliding child's subtree to find nested ScrollView
+            for widget in child.walk(restrict=True):
+                if isinstance(widget, ScrollView) and widget.collide_point(*touch.pos):
+                    touch.pop()
+                    return widget
+        touch.pop()
+        return None
+            
+
+
     def on_touch_down(self, touch):
         # SCROLLVIEW TOUCH HANDLING WITH AUTO-NESTED DETECTION
         # =====================================================
         # This method automatically detects nested ScrollView configurations and
-        # sets up coordination. Replaces the NestedScrollViewManager approach.
+        # sets up coordination. 
         
         print(f"\n[on_touch_down ENTRY] {id(self)}: touch.pos={touch.pos}")
         print(f"  self.pos={self.pos}, self.size={self.size}")
@@ -926,20 +893,21 @@ class ScrollView(StencilView):
             print(f"  No collision - returning False immediately")
             return False
         
-        # Check if we're in a nested configuration
-        parent_sv = self._find_parent_scrollview()
-        
         print(f"\n[on_touch_down] {id(self)}: touch.pos={touch.pos}")
-        print(f"  parent_sv={id(parent_sv) if parent_sv else 'None'}")
         print(f"  'nested' in touch.ud={('nested' in touch.ud)}")
         
-        # If we have a parent ScrollView, check if we're already in nested coordination
-        # If parent has already set up the structure, we process normally
-        # If not yet set up, let the parent detect us and set it up first
-        if parent_sv and 'nested' not in touch.ud:
-            # Parent hasn't set up coordination yet - let it handle first
-            print(f"  Has parent but no nested setup - returning False to let parent handle")
-            return False
+        # NESTED DETECTION via touch event flow:
+        # Parent widgets receive touches BEFORE children in Kivy.
+        # - If 'nested' NOT in touch.ud: We're the FIRST ScrollView to see this touch
+        #   (either outer or standalone - check for children below)
+        # - If 'nested' IN touch.ud: We're an INNER ScrollView
+        #   (parent already set up coordination - process as inner)
+        
+        if 'nested' in touch.ud:
+            # We're an INNER ScrollView - parent already set up coordination
+            # Process normally (handled by rest of function)
+            print(f"  We're INNER (nested data already exists)")
+            pass
         
         # Check if touch is on OUR scrollbar - if so, handle it directly (don't look for children)
         # This ensures outer scrollbar works even when there are inner ScrollViews
@@ -959,7 +927,7 @@ class ScrollView(StencilView):
         
         if child_sv:
             # We're the OUTER ScrollView with an INNER child
-            # Set up nested coordination (replaces NestedScrollViewManager role)
+            # Set up nested coordination
             touch.ud['nested'] = {
                 'outer': self,
                 'inner': child_sv,
@@ -1098,7 +1066,6 @@ class ScrollView(StencilView):
     # Cross-ScrollView Shared Keys:
     # - sv.handled: dict {'x': bool, 'y': bool}
     #   Purpose: Tracks which axes have been processed by a ScrollView
-    #   Used by: NestedScrollViewManager for orthogonal delegation
     #   Lifecycle: Set at start of on_touch_move, updated during scroll processing
     #
     # - sv.can_defocus: bool
@@ -1173,7 +1140,7 @@ class ScrollView(StencilView):
         # NESTED WHEEL ROUTING LOGIC:
         # Critical for nested ScrollViews - prevents inner SV from consuming
         # wheel events it can't handle, allowing outer SV to process them.
-        # When returning False, NestedScrollViewManager handles the delegation.
+        # When returning False, the outer ScrollView handles the delegation.
         
         if btn in self._MOUSE_WHEEL_HORIZONTAL:
             # Horizontal wheel: only handle if we can scroll horizontally
