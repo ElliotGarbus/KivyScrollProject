@@ -918,17 +918,28 @@ class ScrollView(StencilView):
         # This method automatically detects nested ScrollView configurations and
         # sets up coordination. Replaces the NestedScrollViewManager approach.
         
+        print(f"\n[on_touch_down ENTRY] {id(self)}: touch.pos={touch.pos}")
+        print(f"  self.pos={self.pos}, self.size={self.size}")
+        print(f"  collide_point result={self.collide_point(*touch.pos)}")
+        
         if not self.collide_point(*touch.pos):
+            print(f"  No collision - returning False immediately")
             return False
         
         # Check if we're in a nested configuration
         parent_sv = self._find_parent_scrollview()
         
-        # If we have a parent ScrollView, we're the INNER - let parent coordinate
-        # Parent's on_touch_down will detect us and call our _scroll_initialize directly
-        # We should NOT process on_touch_down independently
-        if parent_sv:
-            return False  # Let parent handle coordination
+        print(f"\n[on_touch_down] {id(self)}: touch.pos={touch.pos}")
+        print(f"  parent_sv={id(parent_sv) if parent_sv else 'None'}")
+        print(f"  'nested' in touch.ud={('nested' in touch.ud)}")
+        
+        # If we have a parent ScrollView, check if we're already in nested coordination
+        # If parent has already set up the structure, we process normally
+        # If not yet set up, let the parent detect us and set it up first
+        if parent_sv and 'nested' not in touch.ud:
+            # Parent hasn't set up coordination yet - let it handle first
+            print(f"  Has parent but no nested setup - returning False to let parent handle")
+            return False
         
         # Check if touch is on OUR scrollbar - if so, handle it directly (don't look for children)
         # This ensures outer scrollbar works even when there are inner ScrollViews
@@ -943,8 +954,8 @@ class ScrollView(StencilView):
         # We might be the outer ScrollView - check for child at touch position
         child_sv = self._find_child_scrollview_at_touch(touch)
         
-        # DEBUG: Log child detection
-        # print(f"[DEBUG on_touch_down] Outer {id(self)}: child_sv = {id(child_sv) if child_sv else 'None'}")
+        is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
+        print(f"  child_sv={id(child_sv) if child_sv else 'None'}, is_wheel={is_wheel}")
         
         if child_sv:
             # We're the OUTER ScrollView with an INNER child
@@ -996,28 +1007,28 @@ class ScrollView(StencilView):
                     'inner_exclusive': inner_exclusive
                 }
             
-            # Initialize inner ScrollView first (it will handle or delegate)
-            # Transform touch to inner's parent coordinate space
+            # Now initialize scrolling on the inner child
+            # KEY INSIGHT FROM WORKING CODE: Transform to inner's PARENT coordinate space
+            # (NOT viewport, NOT window - the parent widget that contains the inner)
+            print(f"  Outer calling child_sv._scroll_initialize() - transforming to child's parent space")
+            print(f"  Touch in window space: {touch.pos}")
             touch.push()
             touch.apply_transform_2d(child_sv.parent.to_widget)
-            
+            print(f"  Touch in child's parent space: {touch.pos}")
             result = child_sv._scroll_initialize(touch)
-            
             touch.pop()
-            
+            print(f"  Child _scroll_initialize result: {result}")
             if result:
-                touch.grab(self)  # Outer maintains grab ownership for coordination
-                return True
-            
-            # Inner rejected the touch - check if it's a mouse wheel that we (outer) can handle
-            if 'button' in touch.profile and touch.button.startswith('scroll'):
-                # Mouse wheel was rejected by inner (orthogonal direction)
-                # Try to handle it with outer
-                touch.ud['nested']['mode'] = 'outer'  # Update mode since outer is handling
-                if self._scroll_initialize(touch):
+                # Inner accepted scrolling
+                # For MOUSE WHEEL: Don't grab or set _touch (each wheel event is independent)
+                # For REGULAR TOUCH: Outer grabs, inner's _touch is set for coordination
+                is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
+                if not is_wheel:
+                    # Regular touch: outer grabs, inner tracks the touch
                     touch.grab(self)
-                    return True
-            
+                    child_sv._touch = touch
+                # Wheel events are handled immediately, no grab/touch tracking needed
+                return True
             return False
         
         # We're STANDALONE - no parent, no child
@@ -1243,15 +1254,23 @@ class ScrollView(StencilView):
 
     def _initialize_scroll_effects(self, touch, in_bar):
         # Initialize scroll effects for both axes if enabled.
+        print(f"[_initialize_scroll_effects] {id(self)}: touch.pos={touch.pos}, in_bar={in_bar}")
+        print(f"  do_scroll_x={self.do_scroll_x}, do_scroll_y={self.do_scroll_y}")
+        print(f"  self.pos={self.pos}, self.size={self.size}")
+        print(f"  touch in local: {self.to_local(*touch.pos)}")
+        
         if self.do_scroll_x and self.effect_x and not in_bar:
             self._update_effect_bounds()
             self._effect_x_start_width = self.width
+            print(f"  Starting effect_x with touch.x={touch.x}")
             self.effect_x.start(touch.x)
         
         if self.do_scroll_y and self.effect_y and not in_bar:
             self._update_effect_bounds()
             self._effect_y_start_height = self.height
+            print(f"  Starting effect_y with touch.y={touch.y}, scroll_y before={self.scroll_y}")
             self.effect_y.start(touch.y)
+            print(f"  scroll_y after={self.scroll_y}")
 
     def _should_delegate_orthogonal(self, touch):
         # Check if touch movement is orthogonal to scroll direction.
@@ -1457,21 +1476,46 @@ class ScrollView(StencilView):
         # it is used to determine if the scrollview should handle the touch
         # and to initialize the scroll effects
         
+        print(f"\n[_scroll_initialize] {id(self)}: touch.pos={touch.pos}")
+        print(f"  collide_point={self.collide_point(*touch.pos)}")
+        print(f"  'nested' in touch.ud={('nested' in touch.ud)}")
+        if 'nested' in touch.ud:
+            print(f"  nested outer={id(touch.ud['nested'].get('outer'))}, inner={id(touch.ud['nested'].get('inner'))}")
+            print(f"  nested mode={touch.ud['nested'].get('mode')}")
+            is_inner = (touch.ud['nested'].get('inner') == self)
+            print(f"  is_inner={is_inner}")
+        
         # Check if this touch was claimed by a child widget (e.g., button)
         # If so, don't initialize scrolling
         if self._get_uid('claimed_by_child') in touch.ud:
+            print(f"  Claimed by child - returning False")
             return False
         
-        if not self.collide_point(*touch.pos):
+        # Skip collision check if we're the inner in a nested setup and parent already validated
+        # (parent called us directly after finding us with _find_child_scrollview_at_touch)
+        skip_collision = ('nested' in touch.ud and touch.ud['nested'].get('inner') == self)
+        print(f"  skip_collision={skip_collision}")
+        
+        if not skip_collision and not self.collide_point(*touch.pos):
+            print(f"  No collision - returning False")
             touch.ud[self._get_uid('svavoid')] = True
             return False
+        
+        if skip_collision:
+            print(f"  Collision check skipped (inner in nested setup)")
+        else:
+            print(f"  Collision check passed")
 
         if self.disabled:
             return True
         
         if self._touch:
             # Already handling a touch - reject this one to enforce single-touch policy
-            return False
+            # EXCEPT for mouse wheel events which are independent
+            is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
+            if not is_wheel:
+                return False
+            # For wheel events, continue processing even if we have an active touch
         
         if not (self.do_scroll_x or self.do_scroll_y):
             # Scrolling is disabled for both axes
@@ -1578,11 +1622,15 @@ class ScrollView(StencilView):
             
             mode = nested_data.get('mode')
             if mode == 'inner':
-                # Inner is handling - delegate to inner
+                # Inner is handling - delegate to inner WITH COORDINATE TRANSFORMATION
                 inner = nested_data.get('inner')
                 if inner:
                     touch.ud['sv.handled'] = {'x': False, 'y': False}
+                    # Transform touch to inner's parent coordinate space (like in on_touch_down)
+                    touch.push()
+                    touch.apply_transform_2d(inner.parent.to_widget)
                     result = inner._scroll_update(touch)
+                    touch.pop()
                     
                     # If inner rejected (orthogonal delegation), switch to outer
                     if not result:
@@ -1724,12 +1772,16 @@ class ScrollView(StencilView):
             mode = nested_data.get('mode')
             
             if mode == 'inner':
-                # Inner was handling - finalize inner
+                # Inner was handling - finalize inner WITH COORDINATE TRANSFORMATION
                 inner = nested_data.get('inner')
                 if inner:
                     inner_uid = inner._get_uid()
                     if inner_uid in touch.ud:
+                        # Transform touch to inner's parent coordinate space (like in on_touch_down/move)
+                        touch.push()
+                        touch.apply_transform_2d(inner.parent.to_widget)
                         inner._scroll_finalize(touch)
+                        touch.pop()
                         if not touch.ud[inner_uid].get('can_defocus', True):
                             FocusBehavior.ignored_touch.append(touch)
             elif mode == 'outer':
