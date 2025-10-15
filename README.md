@@ -1,4 +1,4 @@
-Proposed implementation for nested ScrollView. This is a WIP.
+Updated implementation for ScrollView. with 2 layer nesting support.  This is a WIP.
 
 An initial implementation is in the V0 Obsolete Directory
 
@@ -72,7 +72,7 @@ Demonstrations/tests using the updated ScrollView: (NEED TO BE UPDATED - Delete 
 - demo_single_vertical - non-nested vertical scrollview
 - demo_single_xy - non-nested XY scrollview
 
-- demo_scroll_events_non_neseted.py - tool for observing scroll event firing (start, move, stop) within a single, non-nested ScrollView
+- demo_scroll_events_non_neseted.py - observing scroll event firing (start, move, stop) within a single, non-nested ScrollView
 - demo_scroll_events_nested.py - color-coded scroll events for nested vertical and horizontal ScrollViews; in nested scenarios.
 
 - demo_drag_from_scroll.py - Dragging buttons out of a single ScrollView

@@ -1029,6 +1029,16 @@ class ScrollView(StencilView):
                     child_sv._touch = touch
                 # Wheel events are handled immediately, no grab/touch tracking needed
                 return True
+            
+            # Inner rejected the touch
+            # For MOUSE WHEEL in orthogonal setups, try outer ScrollView
+            is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
+            if is_wheel:
+                print(f"  Inner rejected wheel - trying outer")
+                # Try outer with ORIGINAL touch (already popped above)
+                touch.ud['nested']['mode'] = 'outer'  # Update mode for tracking
+                if self._scroll_initialize(touch):
+                    return True
             return False
         
         # We're STANDALONE - no parent, no child
@@ -1625,6 +1635,13 @@ class ScrollView(StencilView):
                 # Inner is handling - delegate to inner WITH COORDINATE TRANSFORMATION
                 inner = nested_data.get('inner')
                 if inner:
+                    # Check if inner's child widget claimed the touch (button press, etc.)
+                    inner_claimed = inner._get_uid('claimed_by_child') in touch.ud
+                    if inner_claimed:
+                        # Inner's child claimed touch - don't scroll outer or inner
+                        # Just let the touch pass to the inner's children
+                        return True
+                    
                     touch.ud['sv.handled'] = {'x': False, 'y': False}
                     # Transform touch to inner's parent coordinate space (like in on_touch_down)
                     touch.push()
@@ -1660,6 +1677,11 @@ class ScrollView(StencilView):
                         return self._scroll_update(touch)
                     return result
             elif mode == 'outer':
+                # Check if inner's child widget claimed the touch
+                inner = nested_data.get('inner')
+                if inner and inner._get_uid('claimed_by_child') in touch.ud:
+                    # Inner's child claimed touch - don't scroll outer either
+                    return True
                 # Outer is handling - process normally
                 touch.ud['sv.handled'] = {'x': False, 'y': False}
                 return self._scroll_update(touch)
