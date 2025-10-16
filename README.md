@@ -1,4 +1,4 @@
-Updated implementation for ScrollView. with 2 layer nesting support.  This is a WIP.
+Updated implementation for ScrollView with 2 layer nesting support.
 
 An initial implementation is in the V0 Obsolete Directory
 
@@ -51,13 +51,13 @@ parallel_delegation = BooleanProperty(True)
 
 Key files:
 Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollViewManger to route the touches 
-to the inner and outer scrollview.
+to the inner and outer ScrollView.
 Things worked nicely, but I have decided to integrate the capabilities back into ScrollView, 
 rather than have two separate widgets.
 
  - updated_sv_no_manager.py - ScrollView with Nesting support
 
-Demonstrations/tests using the updated ScrollView: (NEED TO BE UPDATED - Delete manager)
+Demonstrations/tests using the updated ScrollView: 
 - demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) 
 - demo_nested_horizontal.py - Horizontal parallel ScrollViews 
 - demo_nested_vertical.py - Multiple vertical parallel ScrollViews
