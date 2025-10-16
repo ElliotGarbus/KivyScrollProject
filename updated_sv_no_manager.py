@@ -197,6 +197,8 @@ __all__ = ('ScrollView', )
 
 from functools import partial
 from math import isclose
+from enum import Enum
+
 from kivy.animation import Animation
 from kivy.config import Config
 from kivy.clock import Clock
@@ -209,6 +211,26 @@ from kivy.properties import NumericProperty, BooleanProperty, AliasProperty, \
     ObjectProperty, ListProperty, ReferenceListProperty, OptionProperty, \
     ColorProperty
 from kivy.uix.behaviors import FocusBehavior
+
+
+
+# =============================================================================
+# STATE MACHINE ENUMS
+# =============================================================================
+
+class ScrollMode(str, Enum):
+    # Touch intent detection state machine
+    # Tracks whether a touch is a tap/click or a scroll gesture
+    UNKNOWN = 'unknown'  # Detecting intent - accumulating movement
+    SCROLL = 'scroll'    # Confirmed scroll gesture - movement exceeded threshold
+
+
+class DelegationMode(str, Enum):
+    # Web-style boundary delegation state machine for parallel nested scrolling
+    # Controls when inner ScrollView delegates to outer at scroll boundaries
+    UNKNOWN = 'unknown'              # Normal scrolling, no delegation active
+    START_AT_BOUNDARY = 'start_at_boundary'  # Touch began at scroll boundary
+    LOCKED = 'locked'                # At boundary trying to scroll beyond - delegate to outer
 
 
 # When we are generating documentation, Config doesn't exist
@@ -1024,7 +1046,7 @@ class ScrollView(StencilView):
             
         # Set delegation_mode based on boundary state in PARALLEL directions only
         if at_boundary_x or at_boundary_y:
-            touch.ud['nested']['delegation_mode'] = 'start_at_boundary'
+            touch.ud['nested']['delegation_mode'] = DelegationMode.START_AT_BOUNDARY
     
     def _delegate_to_outer_scroll(self, touch, inner):
         # Switch scrolling from inner to outer ScrollView during touch move.
@@ -1044,7 +1066,7 @@ class ScrollView(StencilView):
         outer_uid = self._get_uid()
         if outer_uid not in touch.ud:
             touch.ud[outer_uid] = {
-                'mode': 'scroll',  # Already scrolling (not 'unknown')
+                'mode': ScrollMode.SCROLL,  # Already scrolling (not UNKNOWN)
                 'dx': 0,
                 'dy': 0,
                 'scroll_action': False,
@@ -1142,7 +1164,7 @@ class ScrollView(StencilView):
         
         # Transition to scroll mode if movement exceeds threshold
         if (ud['dx'] > self.scroll_distance or ud['dy'] > self.scroll_distance):
-            ud['mode'] = 'scroll'
+            ud['mode'] = ScrollMode.SCROLL
             # Only dispatch on_scroll_start if we weren't already scrolling (e.g. from scrollbar)
             if not ud['scroll_action']:
                 self.dispatch('on_scroll_start')
@@ -1280,7 +1302,7 @@ class ScrollView(StencilView):
                 'outer': self,
                 'inner': child_sv,
                 'mode': 'inner',  # Start with inner handling touch
-                'delegation_mode': 'unknown'  # Will be set in _scroll_initialize
+                'delegation_mode': DelegationMode.UNKNOWN  # Will be set in _scroll_initialize
             }
             
             # Classify nested configuration and store axis info if mixed
@@ -1325,7 +1347,7 @@ class ScrollView(StencilView):
     # Per-ScrollView Instance Keys:
     # - sv.<uid>: Primary state dict for this ScrollView instance
     #   Contains: {
-    #     'mode': str,          # 'unknown' (detecting intent) -> 'scroll' (confirmed)
+    #     'mode': ScrollMode,   # State machine: UNKNOWN (detecting intent) -> SCROLL (confirmed)
     #     'dx': float,          # accumulated absolute X movement for detection
     #     'dy': float,          # accumulated absolute Y movement for detection  
     #     'scroll_action': bool,# True if touch started in scrollbar (skips on_scroll_start dispatch)
@@ -1367,8 +1389,8 @@ class ScrollView(StencilView):
     #                                      #   'inner_exclusive': list,  # axes only inner can scroll
     #                                      #   'shared': list            # axes both can scroll
     #                                      # }
-    #     'delegation_mode': str (optional)  # 'unknown', 'locked', 'start_at_boundary'
-    #                                        # Tracks web-style delegation state for parallel scrolling
+    #     'delegation_mode': DelegationMode (optional)  # UNKNOWN, LOCKED, START_AT_BOUNDARY
+    #                                        # State machine for web-style delegation in parallel scrolling
     #   }
     #   Purpose: Routes touches between outer and inner ScrollViews
     #   Lifecycle: Set in outer's on_touch_down, used throughout touch lifecycle
@@ -1632,17 +1654,17 @@ class ScrollView(StencilView):
         if not outer or not outer.parallel_delegation:
             return False
         
-        delegation_mode = nested_data.get('delegation_mode', 'unknown')
+        delegation_mode = nested_data.get('delegation_mode', DelegationMode.UNKNOWN)
         
         # If not in delegation mode, never lock
-        if delegation_mode == 'unknown':
+        if delegation_mode == DelegationMode.UNKNOWN:
             return False
         
         # If already locked, keep it locked (inner doesn't scroll, stays locked for this gesture)
-        if delegation_mode == 'locked':
+        if delegation_mode == DelegationMode.LOCKED:
             return True
         
-        # delegation_mode == 'start_at_boundary'
+        # delegation_mode == START_AT_BOUNDARY
         # Check if we're trying to scroll beyond the boundary OR moved away into content
         abs_dx = abs(touch.dx)
         abs_dy = abs(touch.dy)
@@ -1650,31 +1672,31 @@ class ScrollView(StencilView):
         if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
             # Check if we've moved away from the boundary into content
             if 0.05 < self.scroll_x < 0.95:
-                touch.ud['nested']['delegation_mode'] = 'unknown'
+                touch.ud['nested']['delegation_mode'] = DelegationMode.UNKNOWN
                 return False
             
             # At right boundary trying to scroll left (beyond)
             if touch.dx < 0 and self.scroll_x >= 0.95:
-                touch.ud['nested']['delegation_mode'] = 'locked'
+                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
                 return True
             # At left boundary trying to scroll right (beyond)
             elif touch.dx > 0 and self.scroll_x <= 0.05:
-                touch.ud['nested']['delegation_mode'] = 'locked'
+                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
                 return True
                 
         elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling
             # Check if we've moved away from the boundary into content
             if 0.05 < self.scroll_y < 0.95:
-                touch.ud['nested']['delegation_mode'] = 'unknown'
+                touch.ud['nested']['delegation_mode'] = DelegationMode.UNKNOWN
                 return False
             
             # At bottom boundary trying to scroll up (beyond)
             if touch.dy < 0 and self.scroll_y >= 0.95:
-                touch.ud['nested']['delegation_mode'] = 'locked'
+                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
                 return True
             # At top boundary trying to scroll down (beyond)
             elif touch.dy > 0 and self.scroll_y <= 0.05:
-                touch.ud['nested']['delegation_mode'] = 'locked'
+                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
                 return True
         
         return False
@@ -1797,7 +1819,7 @@ class ScrollView(StencilView):
         # Set the touch state for this touch
         uid = self._get_uid()
         ud[uid] = {
-            'mode': 'unknown',
+            'mode': ScrollMode.UNKNOWN,
             'dx': 0,
             'dy': 0,
             'scroll_action': in_bar,
@@ -1881,12 +1903,12 @@ class ScrollView(StencilView):
         
         # Detect scroll intent (unknown -> scroll mode transition)
         ud = touch.ud[uid]
-        if ud['mode'] == 'unknown':
+        if ud['mode'] == ScrollMode.UNKNOWN:
             if not self._detect_scroll_intent(touch, ud):
                 return False
         
         # Process active scrolling
-        if ud['mode'] == 'scroll':
+        if ud['mode'] == ScrollMode.SCROLL:
             not_in_bar = not touch.ud['in_bar_x'] and not touch.ud['in_bar_y']
             
             # Check if inner should delegate to outer
@@ -1968,17 +1990,17 @@ class ScrollView(StencilView):
         
         # Start checking for velocity-based stop if this was a scroll
         # this is used to dispatch the on_scroll_stop event
-        if ud['mode'] == 'scroll' or ud['scroll_action']:
+        if ud['mode'] == ScrollMode.SCROLL or ud['scroll_action']:
             if self._velocity_check_ev:
                 self._velocity_check_ev.cancel()
             self._velocity_check_ev = Clock.schedule_interval(
                 self._check_velocity_for_stop, 1/60.0)
             
         # CLICK PASSTHROUGH LOGIC
-        # If the gesture never transitioned from 'unknown' to 'scroll' mode,
+        # If the gesture never transitioned from UNKNOWN to SCROLL mode,
         # it means the user made a tap/click rather than a scroll gesture.
         # We need to simulate the click for child widgets to handle.
-        if ud['mode'] == 'unknown':
+        if ud['mode'] == ScrollMode.UNKNOWN:
             # Only simulate click if no scroll action occurred
             # (e.g., no scroll bar interaction or dragging)
             if not ud['scroll_action']:
@@ -2265,7 +2287,7 @@ class ScrollView(StencilView):
             
         ud = touch.ud[uid]
         # Only proceed if we're still in gesture detection mode
-        if ud['mode'] != 'unknown' or ud['scroll_action']:
+        if ud['mode'] != ScrollMode.UNKNOWN or ud['scroll_action']:
             return
             
         # SLOW DEVICE PROTECTION:
