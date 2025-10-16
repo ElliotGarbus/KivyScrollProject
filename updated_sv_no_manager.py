@@ -186,8 +186,6 @@ This behavior can be disabled by setting :attr:`parallel_delegation` to False.
 '''
 
 
-# TODO: update the implementation.
-# TODO: Formalize the touch.ud, look at using ENUMs
 # TODO: create a test suite for the updated ScrollView for the kivy test suite.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
 # TODO: formatting prior to PR
@@ -219,18 +217,83 @@ from kivy.uix.behaviors import FocusBehavior
 # =============================================================================
 
 class ScrollMode(str, Enum):
-    # Touch intent detection state machine
-    # Tracks whether a touch is a tap/click or a scroll gesture
+    """Touch intent detection state machine.
+    
+    Tracks whether a touch gesture is a tap/click or a scroll gesture
+    based on movement distance and timeout thresholds.
+    
+    State Transition Diagram:
+    ┌─────────┐  movement >                 ┌────────┐
+    │ UNKNOWN │──scroll_distance───────────>│ SCROLL │
+    └─────────┘                             └────────┘
+       │
+       │  timeout expires
+       └───────────────> click passthrough to children
+    
+    State Descriptions:
+    - UNKNOWN: Initial state, accumulating movement to detect intent
+    - SCROLL: Scroll gesture confirmed, ScrollView handles touch movement
+    """
     UNKNOWN = 'unknown'  # Detecting intent - accumulating movement
     SCROLL = 'scroll'    # Confirmed scroll gesture - movement exceeded threshold
 
 
 class DelegationMode(str, Enum):
-    # Web-style boundary delegation state machine for parallel nested scrolling
-    # Controls when inner ScrollView delegates to outer at scroll boundaries
+    """Web-style boundary delegation state machine.
+    
+    Controls when an inner ScrollView delegates scrolling to its outer
+    ScrollView in parallel nested configurations (both scrolling same axis).
+
+    State Descriptions:
+    - UNKNOWN: Normal scrolling, no delegation. Inner scrolls freely.
+    - START_AT_BOUNDARY: Touch began at inner's boundary. Watching movement direction.
+    - LOCKED: Touch trying to scroll beyond boundary. Outer takes over, inner blocked.
+    
+    State Transition Diagram:
+    
+    Touch starts NOT at boundary:
+        ┌─────────┐
+        │ UNKNOWN │ (stays UNKNOWN entire gesture, inner scrolls freely)
+        └─────────┘
+    
+    Touch starts AT boundary:
+        ┌──────────────────┐
+        │ START_AT_BOUNDARY│─────┐
+        └──────────────────┘     │
+                │                │
+                │                │
+        move into content  scroll beyond boundary
+                │                │
+                v                v
+        ┌─────────┐          ┌────────┐
+        │ UNKNOWN │          │ LOCKED │ (stays LOCKED entire gesture)
+        └─────────┘          └────────┘
+    
+    Key: Once LOCKED, stays LOCKED until touch release (no transitions out)
+    
+    Example (Vertical Parallel):
+    1. User touches inner ScrollView at bottom (scroll_y = 1.0)
+       -> START_AT_BOUNDARY
+    2a. User drags down (into content) -> UNKNOWN (inner scrolls normally)
+    2b. User drags up (beyond bottom edge) -> LOCKED (outer takes over)
+    3. If LOCKED: stays LOCKED, outer handles all further movement
+
+ 
+    """
     UNKNOWN = 'unknown'              # Normal scrolling, no delegation active
     START_AT_BOUNDARY = 'start_at_boundary'  # Touch began at scroll boundary
     LOCKED = 'locked'                # At boundary trying to scroll beyond - delegate to outer
+
+
+# =============================================================================
+# CONFIGURATION CONSTANTS
+# =============================================================================
+
+# Boundary threshold for web-style delegation (normalized scroll position 0.0 to 1.0)
+# A ScrollView is considered "at boundary" if scroll position is within this threshold
+# of the minimum (0.0) or maximum (1.0) position.
+# Used for parallel nested scrolling to determine when to delegate to outer ScrollView.
+_BOUNDARY_THRESHOLD = 0.05  # 5% from edge
 
 
 # When we are generating documentation, Config doesn't exist
@@ -897,6 +960,76 @@ class ScrollView(StencilView):
         touch.pop()
         return None
     
+    def _get_primary_scroll_axis(self, touch):
+        # Determine which axis has dominant touch movement.
+        # 
+        # Compares absolute X and Y deltas to determine the primary direction
+        # of the current touch movement. Used for axis-specific scroll logic.
+        # 
+        # Args:
+        #     touch: Touch event with dx and dy attributes
+        # 
+        # Returns:
+        #     str: 'x' if horizontal movement dominates,
+        #          'y' if vertical movement dominates,
+        #          None if no clear dominance
+        abs_dx = abs(touch.dx)
+        abs_dy = abs(touch.dy)
+        
+        if abs_dx > abs_dy:
+            return 'x'
+        elif abs_dy > abs_dx:
+            return 'y'
+        return None
+    
+    def _is_at_scroll_boundary(self, axis):
+        # Check if scroll position is at or near boundary on given axis.
+        # 
+        # A ScrollView is considered "at boundary" if its scroll position
+        # is within _BOUNDARY_THRESHOLD of the minimum (0.0) or maximum (1.0).
+        # Used for web-style delegation in parallel nested scrolling.
+        # 
+        # Args:
+        #     axis: 'x' or 'y' - which axis to check
+        # 
+        # Returns:
+        #     bool: True if at boundary (within threshold), False otherwise
+        if axis == 'x' and self.do_scroll_x:
+            return (self.scroll_x <= _BOUNDARY_THRESHOLD or 
+                    self.scroll_x >= (1.0 - _BOUNDARY_THRESHOLD))
+        elif axis == 'y' and self.do_scroll_y:
+            return (self.scroll_y <= _BOUNDARY_THRESHOLD or 
+                    self.scroll_y >= (1.0 - _BOUNDARY_THRESHOLD))
+        return False
+    
+    def _is_scrolling_beyond_boundary(self, axis, touch):
+        # Check if touch is trying to scroll beyond current boundary.
+        # 
+        # Determines if the touch movement would scroll past the edge of
+        # the scrollable content. Used to trigger delegation to outer ScrollView.
+        # 
+        # Args:
+        #     axis: 'x' or 'y' - which axis to check
+        #     touch: Touch event with dx/dy movement
+        # 
+        # Returns:
+        #     bool: True if trying to scroll beyond boundary, False otherwise
+        if axis == 'x' and self.do_scroll_x:
+            # At right edge, trying to scroll left (beyond)
+            if touch.dx < 0 and self.scroll_x >= (1.0 - _BOUNDARY_THRESHOLD):
+                return True
+            # At left edge, trying to scroll right (beyond)
+            if touch.dx > 0 and self.scroll_x <= _BOUNDARY_THRESHOLD:
+                return True
+        elif axis == 'y' and self.do_scroll_y:
+            # At bottom edge, trying to scroll up (beyond)
+            if touch.dy < 0 and self.scroll_y >= (1.0 - _BOUNDARY_THRESHOLD):
+                return True
+            # At top edge, trying to scroll down (beyond)
+            if touch.dy > 0 and self.scroll_y <= _BOUNDARY_THRESHOLD:
+                return True
+        return False
+    
     def _classify_nested_configuration(self, child_sv):
         # Classify the nested ScrollView configuration type.
         # 
@@ -1035,14 +1168,12 @@ class ScrollView(StencilView):
         # the inner should freely overscroll in Y direction without delegation.
         
         # Check X boundary only if both inner and outer scroll horizontally
-        # Using 0.05 epsilon (5%) to match _should_lock_at_boundary threshold
         at_boundary_x = (self.do_scroll_x and outer.do_scroll_x and 
-                        (self.scroll_x <= 0.05 or self.scroll_x >= 0.95))
+                        self._is_at_scroll_boundary('x'))
         
         # Check Y boundary only if both inner and outer scroll vertically
-        # Using 0.05 epsilon (5%) to match _should_lock_at_boundary threshold  
         at_boundary_y = (self.do_scroll_y and outer.do_scroll_y and 
-                        (self.scroll_y <= 0.05 or self.scroll_y >= 0.95))
+                        self._is_at_scroll_boundary('y'))
             
         # Set delegation_mode based on boundary state in PARALLEL directions only
         if at_boundary_x or at_boundary_y:
@@ -1666,36 +1797,27 @@ class ScrollView(StencilView):
         
         # delegation_mode == START_AT_BOUNDARY
         # Check if we're trying to scroll beyond the boundary OR moved away into content
-        abs_dx = abs(touch.dx)
-        abs_dy = abs(touch.dy)
+        primary_axis = self._get_primary_scroll_axis(touch)
         
-        if self.do_scroll_x and abs_dx > abs_dy:  # Horizontal scrolling
+        if primary_axis == 'x' and self.do_scroll_x:  # Horizontal scrolling
             # Check if we've moved away from the boundary into content
-            if 0.05 < self.scroll_x < 0.95:
+            if not self._is_at_scroll_boundary('x'):
                 touch.ud['nested']['delegation_mode'] = DelegationMode.UNKNOWN
                 return False
             
-            # At right boundary trying to scroll left (beyond)
-            if touch.dx < 0 and self.scroll_x >= 0.95:
-                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
-                return True
-            # At left boundary trying to scroll right (beyond)
-            elif touch.dx > 0 and self.scroll_x <= 0.05:
+            # Check if trying to scroll beyond boundary
+            if self._is_scrolling_beyond_boundary('x', touch):
                 touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
                 return True
                 
-        elif self.do_scroll_y and abs_dy > abs_dx:  # Vertical scrolling
+        elif primary_axis == 'y' and self.do_scroll_y:  # Vertical scrolling
             # Check if we've moved away from the boundary into content
-            if 0.05 < self.scroll_y < 0.95:
+            if not self._is_at_scroll_boundary('y'):
                 touch.ud['nested']['delegation_mode'] = DelegationMode.UNKNOWN
                 return False
             
-            # At bottom boundary trying to scroll up (beyond)
-            if touch.dy < 0 and self.scroll_y >= 0.95:
-                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
-                return True
-            # At top boundary trying to scroll down (beyond)
-            elif touch.dy > 0 and self.scroll_y <= 0.05:
+            # Check if trying to scroll beyond boundary
+            if self._is_scrolling_beyond_boundary('y', touch):
                 touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
                 return True
         
