@@ -185,7 +185,7 @@ delegation behavior:
 This behavior can be disabled by setting :attr:`parallel_delegation` to False.
 '''
 
-
+# TODO: create demos that include TextInputs to check focus behavior.
 # TODO: create a test suite for the updated ScrollView for the kivy test suite.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
 # TODO: formatting prior to PR
