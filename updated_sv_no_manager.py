@@ -217,70 +217,67 @@ from kivy.uix.behaviors import FocusBehavior
 # =============================================================================
 
 class ScrollMode(str, Enum):
-    """Touch intent detection state machine.
+    # Touch intent detection state machine.
     
-    Tracks whether a touch gesture is a tap/click or a scroll gesture
-    based on movement distance and timeout thresholds.
+    # Tracks whether a touch gesture is a tap/click or a scroll gesture
+    # based on movement distance and timeout thresholds.
     
-    State Transition Diagram:
-    ┌─────────┐  movement >                 ┌────────┐
-    │ UNKNOWN │──scroll_distance───────────>│ SCROLL │
-    └─────────┘                             └────────┘
-       │
-       │  timeout expires
-       └───────────────> click passthrough to children
+    # State Transition Diagram:
+    # ┌─────────┐  movement >                 ┌────────┐
+    # │ UNKNOWN │──scroll_distance───────────>│ SCROLL │
+    # └─────────┘                             └────────┘
+    #    │
+    #    │  timeout expires
+    #    └───────────────> click passthrough to children
     
-    State Descriptions:
-    - UNKNOWN: Initial state, accumulating movement to detect intent
-    - SCROLL: Scroll gesture confirmed, ScrollView handles touch movement
-    """
+    # State Descriptions:
+    # - UNKNOWN: Initial state, accumulating movement to detect intent
+    # - SCROLL: Scroll gesture confirmed, ScrollView handles touch movement
     UNKNOWN = 'unknown'  # Detecting intent - accumulating movement
     SCROLL = 'scroll'    # Confirmed scroll gesture - movement exceeded threshold
 
 
 class DelegationMode(str, Enum):
-    """Web-style boundary delegation state machine.
+    # """Web-style boundary delegation state machine.
     
-    Controls when an inner ScrollView delegates scrolling to its outer
-    ScrollView in parallel nested configurations (both scrolling same axis).
+    # Controls when an inner ScrollView delegates scrolling to its outer
+    # ScrollView in parallel nested configurations (both scrolling same axis).
 
-    State Descriptions:
-    - UNKNOWN: Normal scrolling, no delegation. Inner scrolls freely.
-    - START_AT_BOUNDARY: Touch began at inner's boundary. Watching movement direction.
-    - LOCKED: Touch trying to scroll beyond boundary. Outer takes over, inner blocked.
+    # State Descriptions:
+    # - UNLOCKED: Normal scrolling, no delegation. Inner scrolls freely.
+    # - START_AT_BOUNDARY: Touch began at inner's boundary. Watching movement direction.
+    # - LOCKED: Touch trying to scroll beyond boundary. Outer takes over, inner blocked.
     
-    State Transition Diagram:
+    # State Transition Diagram:
     
-    Touch starts NOT at boundary:
-        ┌─────────┐
-        │ UNKNOWN │ (stays UNKNOWN entire gesture, inner scrolls freely)
-        └─────────┘
+    # Touch starts NOT at boundary:
+    #     ┌──────────┐
+    #     │ UNLOCKED │ (stays UNLOCKED entire gesture, inner scrolls freely)
+    #     └──────────┘
     
-    Touch starts AT boundary:
-        ┌──────────────────┐
-        │ START_AT_BOUNDARY│─────┐
-        └──────────────────┘     │
-                │                │
-                │                │
-        move into content  scroll beyond boundary
-                │                │
-                v                v
-        ┌─────────┐          ┌────────┐
-        │ UNKNOWN │          │ LOCKED │ (stays LOCKED entire gesture)
-        └─────────┘          └────────┘
+    # Touch starts AT boundary:
+    #     ┌──────────────────┐
+    #     │ START_AT_BOUNDARY│─────┐
+    #     └──────────────────┘     │
+    #             │                │
+    #             │                │
+    #     move into content  scroll beyond boundary
+    #             │                │
+    #             v                v
+    #     ┌──────────┐         ┌────────┐
+    #     │ UNLOCKED │         │ LOCKED │ (stays LOCKED entire gesture)
+    #     └──────────┘         └────────┘
     
-    Key: Once LOCKED, stays LOCKED until touch release (no transitions out)
+    # Key: Once LOCKED, stays LOCKED until touch release (no transitions out)
     
-    Example (Vertical Parallel):
-    1. User touches inner ScrollView at bottom (scroll_y = 1.0)
-       -> START_AT_BOUNDARY
-    2a. User drags down (into content) -> UNKNOWN (inner scrolls normally)
-    2b. User drags up (beyond bottom edge) -> LOCKED (outer takes over)
-    3. If LOCKED: stays LOCKED, outer handles all further movement
+    # Example (Vertical Parallel):
+    # 1. User touches inner ScrollView at bottom (scroll_y = 1.0)
+    #    -> START_AT_BOUNDARY
+    # 2a. User drags down (into content) -> UNLOCKED (inner scrolls normally)
+    # 2b. User drags up (beyond bottom edge) -> LOCKED (outer takes over)
+    # 3. If LOCKED: stays LOCKED, outer handles all further movement
 
- 
-    """
-    UNKNOWN = 'unknown'              # Normal scrolling, no delegation active
+    UNLOCKED = 'unlocked'            # Normal scrolling, no delegation active
     START_AT_BOUNDARY = 'start_at_boundary'  # Touch began at scroll boundary
     LOCKED = 'locked'                # At boundary trying to scroll beyond - delegate to outer
 
@@ -1434,7 +1431,7 @@ class ScrollView(StencilView):
                 'inner': child_sv,
                 'mode': 'inner',  # Start with inner handling touch
                 'config_type': config_type,  # Store configuration type
-                'delegation_mode': DelegationMode.UNKNOWN  # Will be set in _scroll_initialize
+                'delegation_mode': DelegationMode.UNLOCKED  # Will be set in _scroll_initialize
             }
             
             # Store axis_config for mixed configurations
@@ -1756,7 +1753,7 @@ class ScrollView(StencilView):
         delegation_mode = touch.ud['nested']['delegation_mode']
         
         # If not in delegation mode, never lock
-        if delegation_mode == DelegationMode.UNKNOWN:
+        if delegation_mode == DelegationMode.UNLOCKED:
             return False
         
         # If already locked, keep it locked (inner doesn't scroll, stays locked for this gesture)
@@ -1770,7 +1767,7 @@ class ScrollView(StencilView):
         if primary_axis == 'x' and self.do_scroll_x:  # Horizontal scrolling
             # Check if we've moved away from the boundary into content
             if not self._is_at_scroll_boundary('x'):
-                touch.ud['nested']['delegation_mode'] = DelegationMode.UNKNOWN
+                touch.ud['nested']['delegation_mode'] = DelegationMode.UNLOCKED
                 return False
             
             # Check if trying to scroll beyond boundary
@@ -1781,7 +1778,7 @@ class ScrollView(StencilView):
         elif primary_axis == 'y' and self.do_scroll_y:  # Vertical scrolling
             # Check if we've moved away from the boundary into content
             if not self._is_at_scroll_boundary('y'):
-                touch.ud['nested']['delegation_mode'] = DelegationMode.UNKNOWN
+                touch.ud['nested']['delegation_mode'] = DelegationMode.UNLOCKED
                 return False
             
             # Check if trying to scroll beyond boundary
