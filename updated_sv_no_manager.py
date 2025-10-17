@@ -1336,7 +1336,6 @@ class ScrollView(StencilView):
         # MIXED CASE DELEGATION: handle outer/inner-exclusive axes only
         # Shared axes fall through to boundary check below
         if self._should_delegate_mixed(touch):
-            self._change_touch_mode(touch)
             return True  # Delegate to outer
         
         # BOUNDARY DELEGATION: web-style boundary behavior
