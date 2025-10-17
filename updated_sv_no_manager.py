@@ -1042,24 +1042,28 @@ class ScrollView(StencilView):
         #     child_sv: The inner ScrollView
         # 
         # Returns:
-        #     dict or None: If mixed, returns axis_config dict with 'shared',
-        #                   'outer_exclusive', and 'inner_exclusive' lists.
-        #                   If not mixed, returns None.
+        #     tuple: (config_type, axis_config)
+        #         config_type: 'orthogonal', 'parallel', or 'mixed'
+        #         axis_config: dict with 'shared', 'outer_exclusive', 'inner_exclusive'
+        #                     (only for mixed configurations, None otherwise)
         
         outer_axes = (self.do_scroll_x, self.do_scroll_y)
         inner_axes = (child_sv.do_scroll_x, child_sv.do_scroll_y)
         
+        # Determine configuration type
         is_orthogonal = (outer_axes[0] != inner_axes[0] and 
                        outer_axes[1] != inner_axes[1] and 
                        (outer_axes[0] or outer_axes[1]) and 
                        (inner_axes[0] or inner_axes[1]))
+        
+        if is_orthogonal:
+            return ('orthogonal', None)
+        
         is_parallel = (outer_axes == inner_axes)
-        is_mixed = not is_orthogonal and not is_parallel
+        if is_parallel:
+            return ('parallel', None)
         
-        if not is_mixed:
-            return None
-        
-        # For mixed configurations, determine axis capabilities
+        # Mixed configuration - determine axis capabilities
         shared = []
         outer_exclusive = []
         inner_exclusive = []
@@ -1080,11 +1084,13 @@ class ScrollView(StencilView):
         elif not outer_axes[1] and inner_axes[1]:
             inner_exclusive.append('y')
         
-        return {
+        axis_config = {
             'shared': shared,
             'outer_exclusive': outer_exclusive,
             'inner_exclusive': inner_exclusive
         }
+        
+        return ('mixed', axis_config)
     
     def _initialize_nested_inner(self, touch, child_sv):
         # Initialize scrolling on the inner ScrollView with proper coordinate transformation.
@@ -1303,12 +1309,10 @@ class ScrollView(StencilView):
         return True
     
     def _check_nested_delegation(self, touch, not_in_bar):
-        # Check if inner ScrollView should delegate to outer.
+        # Check if inner ScrollView should delegate to outer using config_type.
         # 
-        # Evaluates three delegation scenarios:
-        # 1. Orthogonal: Movement in unsupported direction (e.g., vertical drag on horizontal-only)
-        # 2. Mixed: Movement on outer-exclusive axis in mixed configurations
-        # 3. Boundary: Parallel scrolling at boundary (web-style behavior)
+        # Configuration type was determined once at touch_down, eliminating 
+        # redundant checking on every touch_move.
         # 
         # Only applies to inner ScrollViews scrolling content (not scrollbars).
         # 
@@ -1328,21 +1332,15 @@ class ScrollView(StencilView):
         if not not_in_bar:
             return False
         
-        # ORTHOGONAL DELEGATION: delegate if movement is in unsupported direction
-        # (e.g., H inner + V outer, drag vertically)
-        if self._should_delegate_orthogonal(touch):
-            return True  # Delegate to outer
+        # Use pre-determined configuration type to dispatch to correct delegation method
+        config_type = touch.ud['nested']['config_type']
         
-        # MIXED CASE DELEGATION: handle outer/inner-exclusive axes only
-        # Shared axes fall through to boundary check below
-        if self._should_delegate_mixed(touch):
-            return True  # Delegate to outer
-        
-        # BOUNDARY DELEGATION: web-style boundary behavior
-        # Used for PARALLEL cases and SHARED AXES in MIXED cases
-        # Only delegate when trying to scroll BEYOND the boundary
-        if self._should_lock_at_boundary(touch):
-            return True  # Delegate to outer
+        if config_type == 'orthogonal':
+            return self._should_delegate_orthogonal(touch)
+        elif config_type == 'mixed':
+            return self._should_delegate_mixed(touch)
+        elif config_type == 'parallel':
+            return self._should_delegate_parallel(touch)
         
         return False  # Inner continues handling
     
@@ -1427,19 +1425,19 @@ class ScrollView(StencilView):
         
         if child_sv:
             # We're the OUTER ScrollView with an INNER child
-            # Set up nested coordination
+            # Classify configuration once at touch down
+            config_type, axis_config = self._classify_nested_configuration(child_sv)
+            
+            # Set up nested coordination with configuration type
             touch.ud['nested'] = {
                 'outer': self,
                 'inner': child_sv,
                 'mode': 'inner',  # Start with inner handling touch
+                'config_type': config_type,  # Store configuration type
                 'delegation_mode': DelegationMode.UNKNOWN  # Will be set in _scroll_initialize
             }
             
-            # Classify nested configuration and store axis info if mixed
-            # Mixed configurations happen when outer and inner ScrollViews overlap on some,
-            # but not all, scroll axes (e.g. outer is XY, inner is X-only).
-            # The axis_config dict notes which axes are shared and which belong only to the outer or inner.
-            axis_config = self._classify_nested_configuration(child_sv)
+            # Store axis_config for mixed configurations
             if axis_config:
                 touch.ud['nested']['axis_config'] = axis_config
             
@@ -1677,35 +1675,16 @@ class ScrollView(StencilView):
 
     def _should_delegate_orthogonal(self, touch):
         # Check if touch movement is orthogonal to scroll direction.
+        # 
+        # Only called for orthogonal configurations (config_type already verified).
+        # Delegates when movement is in a direction inner can't handle but outer can.
         
-        # CRITICAL: Only delegate in truly ORTHOGONAL nested setups where:
-        # - Inner scrollview doesn't support the movement direction
-        # - Outer scrollview DOES support the movement direction
-        
-        # For PARALLEL setups (both scroll same direction), orthogonal delegation
-        # should NEVER occur - touch stays with originally touched scrollview.
-        
-        # For MIXED setups, delegation is handled by _should_delegate_mixed() instead.
-        
-        # If not in a nested setup, don't delegate
-        if 'nested' not in touch.ud or touch.ud['nested'].get('mode') != 'inner':
-            return False
-        
-        # Skip for mixed cases - they have their own delegation logic
-        if 'axis_config' in touch.ud['nested']:
-            return False
-        
-        # Get the outer scrollview to check if it can handle orthogonal movement
-        outer = touch.ud['nested'].get('outer')
-        if not outer:
-            return False
-        
+        outer = touch.ud['nested']['outer']
         abs_dx = abs(touch.dx)
         abs_dy = abs(touch.dy)
         
-        # Only delegate if:
-        # 1. Movement is SIGNIFICANTLY orthogonal (2x threshold to avoid noise)
-        # 2. AND outer scrollview CAN scroll in that direction
+        # Only delegate if movement is SIGNIFICANTLY orthogonal (2x threshold to avoid noise)
+        # AND outer scrollview CAN scroll in that direction
         
         # Horizontal movement that inner can't handle, but outer can
         if abs_dx > abs_dy * 2 and not self.do_scroll_x and outer.do_scroll_x:
@@ -1719,18 +1698,12 @@ class ScrollView(StencilView):
 
     def _should_delegate_mixed(self, touch):
         # Check if touch should be delegated in mixed nested configurations.
-        
+        # 
+        # Only called for mixed configurations (config_type already verified).
         # Handles ONLY outer-exclusive and inner-exclusive axes.
         # Shared axes use the same boundary logic as parallel cases.
-        
-        # touch: Touch object
-        # Returns: True if should delegate, False otherwise
 
-        nested_data = touch.ud.get('nested')
-        if not nested_data or 'axis_config' not in nested_data:
-            return False
-        
-        config = nested_data['axis_config']
+        config = touch.ud['nested']['axis_config']
         
         # Calculate total movement since touch_down
         total_dx = touch.x - touch.ox
@@ -1758,33 +1731,29 @@ class ScrollView(StencilView):
         if is_vertical_dominant and 'y' in config['inner_exclusive']:
             return False
         
-        # Shared axes: fall through to _should_lock_at_boundary() 
-        # (same behavior as parallel cases)
-        return False
+        # Shared axes: use parallel boundary delegation logic
+        # Call _should_delegate_parallel for shared axes (same behavior as parallel cases)
+        return self._should_delegate_parallel(touch)
 
-    def _should_lock_at_boundary(self, touch):
-        # Check if scroll should lock at boundary (stop scrolling inner, no delegation in same gesture).
-        
+    def _should_delegate_parallel(self, touch):
+        # Check if scroll should lock at boundary for parallel scrolling.
+        # 
+        # Only called for parallel configurations (config_type already verified).
+        # Also used for SHARED AXES in MIXED cases.
+        # 
         # Implements web-style boundary locking based on delegation_mode:
         # - 'unknown': Never lock (touch did not start at boundary)
         # - 'start_at_boundary': Check if moving away from boundary → transition to 'locked' OR moved into content → 'unknown'
         # - 'locked': Already locked, keep inner from scrolling
-        
+        # 
         # Returns True if inner scrollview should stop scrolling (locked state).
         # Does NOT cause delegation to outer - that only happens on NEW touch.
         
-        # Used for both PARALLEL cases and SHARED AXES in MIXED cases.
-        # Only check boundary locking if parallel_delegation is enabled
-        # Otherwise, touches should never be locked/delegated based on boundaries
-        if 'nested' not in touch.ud:
+        outer = touch.ud['nested']['outer']
+        if not outer.parallel_delegation:
             return False
         
-        nested_data = touch.ud['nested']
-        outer = nested_data.get('outer')
-        if not outer or not outer.parallel_delegation:
-            return False
-        
-        delegation_mode = nested_data.get('delegation_mode', DelegationMode.UNKNOWN)
+        delegation_mode = touch.ud['nested']['delegation_mode']
         
         # If not in delegation mode, never lock
         if delegation_mode == DelegationMode.UNKNOWN:
