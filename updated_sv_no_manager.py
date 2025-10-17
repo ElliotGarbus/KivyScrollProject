@@ -1935,7 +1935,7 @@ class ScrollView(StencilView):
                 return True  # Touch grabbed by something else
             
             mode = nested_data['mode']
-            inner = nested_data.get('inner')
+            inner = nested_data['inner']
             
             if mode == 'inner' and inner:
                 # Inner is active - delegate with coordinate transformation
@@ -2010,9 +2010,9 @@ class ScrollView(StencilView):
         
         # NESTED COORDINATION: Check if we're the outer ScrollView
         nested_data = touch.ud.get('nested')
-        if nested_data and nested_data.get('outer') == self:
-            mode = nested_data.get('mode')
-            inner = nested_data.get('inner')
+        if nested_data and nested_data['outer'] == self:
+            mode = nested_data['mode']
+            inner = nested_data['inner']
             
             # Finalize whichever ScrollView was handling the gesture
             if mode == 'inner' and inner:
