@@ -1455,11 +1455,14 @@ class ScrollView(StencilView):
             # Initialize scrolling on the inner child (handles coordinate transformation)
             return self._initialize_nested_inner(touch, child_sv)
         
-        # We're STANDALONE - no parent, no child
+        # We're STANDALONE - no parent, no child ScrollView found
         if self._scroll_initialize(touch):
-            # Only grab if we actually set up scroll state (flag will be set by _scroll_initialize)
+            # Only grab if we actually set up scroll state
             uid = self._get_uid()
             if uid in touch.ud:
+                # We set up scroll state - claim this touch to prevent multi-touch scrolling
+                self._nested_sv_active_touch = touch
+                print(f"DEBUG: OUTER {self} (id={id(self)}) - SETTING nested_sv_active_touch (standalone scroll, touch_id={id(touch)})")
                 touch.grab(self)
             return True
         return False
@@ -2056,6 +2059,11 @@ class ScrollView(StencilView):
         # Touch was handled by this ScrollView
         if uid_key in touch.ud:
             self._scroll_finalize(touch)
+            
+            # Clear the nested ScrollView active touch (standalone case)
+            if self._nested_sv_active_touch is touch:
+                self._nested_sv_active_touch = None
+                print(f"DEBUG: {self} (id={id(self)}) - CLEARING nested_sv_active_touch (standalone touch release, touch_id={id(touch)})")
             
             # Release grab if we still have it (handlers may have released it)
             gl = touch.grab_list or []
