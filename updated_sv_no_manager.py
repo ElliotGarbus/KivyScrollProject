@@ -700,6 +700,7 @@ class ScrollView(StencilView):
 
     def __init__(self, **kwargs):
         self._touch = None
+        self._nested_sv_active_touch = None  # Stores the touch that's currently active in nested scenario
         self._trigger_update_from_scroll = Clock.create_trigger(
             self.update_from_scroll, -1)
         # For velocity-based stop detection for on_scroll_stop
@@ -1121,6 +1122,8 @@ class ScrollView(StencilView):
                 # Regular touch: outer grabs, inner tracks the touch
                 touch.grab(self)
                 child_sv._touch = touch
+                self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
+                print(f"DEBUG: OUTER {self} (id={id(self)}) - SETTING nested_sv_active_touch (nested inner touch, touch_id={id(touch)})")
             # Wheel events are handled immediately, no grab/touch tracking needed
             return True
         
@@ -1397,6 +1400,13 @@ class ScrollView(StencilView):
         if not self.collide_point(*touch.pos):
             return False
         
+        # Check if we already have an active nested ScrollView touch
+        # This prevents multiple ScrollViews from scrolling simultaneously
+        if self._nested_sv_active_touch is not None:
+            print(f"DEBUG: {self} - BLOCKING touch (nested_sv_active_touch is set)")
+            touch.ud[self._get_uid('svavoid')] = True
+            return False
+        
         # NESTED DETECTION via touch event flow:
         # Parent widgets receive touches BEFORE children in Kivy.
         # - If 'nested' NOT in touch.ud: We're the FIRST ScrollView to see this touch
@@ -1442,7 +1452,10 @@ class ScrollView(StencilView):
         
         # We're STANDALONE - no parent, no child
         if self._scroll_initialize(touch):
-            touch.grab(self)
+            # Only grab if we actually set up scroll state (flag will be set by _scroll_initialize)
+            uid = self._get_uid()
+            if uid in touch.ud:
+                touch.grab(self)
             return True
         return False
 
@@ -2008,6 +2021,8 @@ class ScrollView(StencilView):
         # ===================================================
         # Handles touch release for both standalone and nested configurations.
         
+        print(f"DEBUG: on_touch_up called on {self} (id={id(self)}) with touch (id={id(touch)})")
+        
         # NESTED COORDINATION: Check if we're the outer ScrollView
         nested_data = touch.ud.get('nested')
         if nested_data and nested_data['outer'] == self:
@@ -2019,6 +2034,11 @@ class ScrollView(StencilView):
                 self._finalize_nested_inner(touch, inner)
             elif mode == 'outer':
                 self._finalize_nested_outer(touch)
+            
+            # Clear the nested ScrollView active touch (outer only)
+            if self._nested_sv_active_touch is touch:
+                self._nested_sv_active_touch = None
+                print(f"DEBUG: OUTER {self} (id={id(self)}) - CLEARING nested_sv_active_touch (nested touch release, touch_id={id(touch)})")
             
             # Release grab and return
             if touch.grab_current is self:
