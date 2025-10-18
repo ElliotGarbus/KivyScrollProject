@@ -1115,16 +1115,21 @@ class ScrollView(StencilView):
         touch.pop()
         
         if result:
-            # Inner accepted scrolling
-            # For MOUSE WHEEL: Don't grab or set _touch (each wheel event is independent)
-            # For REGULAR TOUCH: Outer grabs, inner's _touch is set for coordination
-            if not is_wheel:
-                # Regular touch: outer grabs, inner tracks the touch
-                touch.grab(self)
-                child_sv._touch = touch
-                self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
-                print(f"DEBUG: OUTER {self} (id={id(self)}) - SETTING nested_sv_active_touch (nested inner touch, touch_id={id(touch)})")
-            # Wheel events are handled immediately, no grab/touch tracking needed
+            # Inner accepted scrolling (or delegated to child widget)
+            # Check if inner actually set up scroll state (not just delegated to button)
+            inner_uid = child_sv._get_uid()
+            if inner_uid in touch.ud:
+                # Inner actually set up scroll state - this is real scrolling
+                # For MOUSE WHEEL: Don't grab or set _touch (each wheel event is independent)
+                # For REGULAR TOUCH: Outer grabs, inner's _touch is set for coordination
+                if not is_wheel:
+                    # Regular touch: outer grabs, inner tracks the touch
+                    touch.grab(self)
+                    child_sv._touch = touch
+                    self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
+                    print(f"DEBUG: OUTER {self} (id={id(self)}) - SETTING nested_sv_active_touch (nested inner touch, touch_id={id(touch)})")
+                # Wheel events are handled immediately, no grab/touch tracking needed
+            # Return True whether inner scrolled or delegated to child widget
             return True
         
         # Inner rejected the touch
