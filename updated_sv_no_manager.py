@@ -223,16 +223,31 @@ class ScrollMode(str, Enum):
     # based on movement distance and timeout thresholds.
     
     # State Transition Diagram:
-    # ┌─────────┐  movement >                 ┌────────┐
-    # │ UNKNOWN │──scroll_distance───────────>│ SCROLL │
-    # └─────────┘                             └────────┘
-    #    │
-    #    │  timeout expires
-    #    └───────────────> click passthrough to children
-    
+    #
+    #                          movement > scroll_distance
+    #                    ┌──────────────────────────────────┐
+    #                    │                                  │
+    #                    │                                  v
+    #              ┌─────────┐                        ┌────────┐
+    #              │ UNKNOWN │                        │ SCROLL │
+    #              └─────────┘                        └────────┘
+    #                    │                                 ^
+    #                    │ timeout expires                 │
+    #                    v                                 │
+    #         try _simulate_touch_down()                   │
+    #                    │                                 │
+    #         ┌──────────┴──────────┐                      │
+    #         │                     │                      │
+    #    child grabbed         no child grabbed            │
+    #         │                     │                      │
+    #         v                     └──────────────────────┘
+    #   hand off to child         transition to SCROLL mode
+    #   (button, etc.)            (label, empty space, etc.)
+    #
     # State Descriptions:
     # - UNKNOWN: Initial state, accumulating movement to detect intent
-    # - SCROLL: Scroll gesture confirmed, ScrollView handles touch movement
+    # - SCROLL: Scroll gesture confirmed - either movement exceeded threshold
+    #           OR timeout expired without child widget consuming the touch
     UNKNOWN = 'unknown'  # Detecting intent - accumulating movement
     SCROLL = 'scroll'    # Confirmed scroll gesture - movement exceeded threshold
 
@@ -1126,8 +1141,7 @@ class ScrollView(StencilView):
                     # Regular touch: outer grabs, inner tracks the touch
                     touch.grab(self)
                     child_sv._touch = touch
-                    self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
-                    print(f"DEBUG: OUTER {self} (id={id(self)}) - SETTING nested_sv_active_touch (nested inner touch, touch_id={id(touch)})")
+                self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
                 # Wheel events are handled immediately, no grab/touch tracking needed
             # Return True whether inner scrolled or delegated to child widget
             return True
@@ -1408,7 +1422,6 @@ class ScrollView(StencilView):
         # Check if we already have an active nested ScrollView touch
         # This prevents multiple ScrollViews from scrolling simultaneously
         if self._nested_sv_active_touch is not None:
-            print(f"DEBUG: {self} - BLOCKING touch (nested_sv_active_touch is set)")
             touch.ud[self._get_uid('svavoid')] = True
             return False
         
@@ -1462,7 +1475,6 @@ class ScrollView(StencilView):
             if uid in touch.ud:
                 # We set up scroll state - claim this touch to prevent multi-touch scrolling
                 self._nested_sv_active_touch = touch
-                print(f"DEBUG: OUTER {self} (id={id(self)}) - SETTING nested_sv_active_touch (standalone scroll, touch_id={id(touch)})")
                 touch.grab(self)
             return True
         return False
@@ -2029,8 +2041,6 @@ class ScrollView(StencilView):
         # ===================================================
         # Handles touch release for both standalone and nested configurations.
         
-        print(f"DEBUG: on_touch_up called on {self} (id={id(self)}) with touch (id={id(touch)})")
-        
         # NESTED COORDINATION: Check if we're the outer ScrollView
         nested_data = touch.ud.get('nested')
         if nested_data and nested_data['outer'] == self:
@@ -2046,7 +2056,6 @@ class ScrollView(StencilView):
             # Clear the nested ScrollView active touch (outer only)
             if self._nested_sv_active_touch is touch:
                 self._nested_sv_active_touch = None
-                print(f"DEBUG: OUTER {self} (id={id(self)}) - CLEARING nested_sv_active_touch (nested touch release, touch_id={id(touch)})")
             
             # Release grab and return
             if touch.grab_current is self:
@@ -2063,7 +2072,6 @@ class ScrollView(StencilView):
             # Clear the nested ScrollView active touch (standalone case)
             if self._nested_sv_active_touch is touch:
                 self._nested_sv_active_touch = None
-                print(f"DEBUG: {self} (id={id(self)}) - CLEARING nested_sv_active_touch (standalone touch release, touch_id={id(touch)})")
             
             # Release grab if we still have it (handlers may have released it)
             gl = touch.grab_list or []
@@ -2437,17 +2445,30 @@ class ScrollView(StencilView):
         
         child_grabbed = self._simulate_touch_down(touch)
         
-        # Only clear ScrollView's state if a child widget grabbed the touch
-        # If no child grabbed it, keep the sv. keys so scrolling can resume
+        touch.pop()
+        
         if child_grabbed:
+            # A child widget grabbed the touch - hand it off completely
             uid = self._get_uid()
             if uid in touch.ud:
                 del touch.ud[uid]
             # Set flag to prevent re-initialization - this touch now belongs to child
             touch.ud[self._get_uid('claimed_by_child')] = True
+            # Clear the nested ScrollView active touch since we're handing off
+            if self._nested_sv_active_touch is touch:
+                self._nested_sv_active_touch = None
+        else:
+            # No child grabbed it (e.g., user is on a label) - transition to SCROLL mode
+            # so the user can begin scrolling without restarting the gesture
+            uid = self._get_uid()
+            if uid in touch.ud:
+                touch.ud[uid]['mode'] = ScrollMode.SCROLL
+                # Dispatch on_scroll_start since we're now ready to scroll
+                self.dispatch('on_scroll_start')
+                # Re-grab since we ungrabbed above
+                touch.grab(self)
+                self._touch = touch
         
-        touch.pop()
-        return
 
     def _do_touch_up(self, touch, *largs):
         # Complete touch lifecycle by sending touch_up to all widgets that grabbed this touch.
