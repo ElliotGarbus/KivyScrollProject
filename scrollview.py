@@ -1406,79 +1406,6 @@ class ScrollView(StencilView):
         uid_key = self._get_uid()
         self._handle_focus_behavior(touch, uid_key)
 
-    # =========================================================================
-    # MAIN TOUCH HANDLING METHODS (in lifecycle order)
-    # =========================================================================
-
-    def on_touch_down(self, touch):
-        # SCROLLVIEW TOUCH HANDLING WITH AUTO-NESTED DETECTION
-        # =====================================================
-        # This method automatically detects nested ScrollView configurations and
-        # sets up coordination. 
-        
-        if not self.collide_point(*touch.pos):
-            return False
-        
-        # Check if we already have an active nested ScrollView touch
-        # This prevents multiple ScrollViews from scrolling simultaneously
-        if self._nested_sv_active_touch is not None:
-            touch.ud[self._get_uid('svavoid')] = True
-            return False
-        
-        # NESTED DETECTION via touch event flow:
-        # Parent widgets receive touches BEFORE children in Kivy.
-        # - If 'nested' NOT in touch.ud: We're the FIRST ScrollView to see this touch
-        #   (either outer or standalone - check for children below)
-        # - If 'nested' IN touch.ud: We're an INNER ScrollView
-        #   (parent already set up coordination - process as inner)
-        
-        # Check if touch is on OUR scrollbar - if so, handle it directly (don't look for children)
-        # This ensures outer scrollbar works even when there are inner ScrollViews
-        in_bar_x, in_bar_y = self._check_scroll_bounds(touch)
-        if in_bar_x or in_bar_y:
-            # Touch is on our scrollbar - handle it directly
-            if self._scroll_initialize(touch):
-                touch.grab(self)
-                return True
-            return False
-        
-        # We might be the outer ScrollView - check for child at touch position
-        child_sv = self._find_child_scrollview_at_touch(touch)
-        
-        is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
-        
-        if child_sv:
-            # We're the OUTER ScrollView with an INNER child
-            # Classify configuration once at touch down
-            config_type, axis_config = self._classify_nested_configuration(child_sv)
-            
-            # Set up nested coordination with configuration type
-            touch.ud['nested'] = {
-                'outer': self,
-                'inner': child_sv,
-                'mode': 'inner',  # Start with inner handling touch
-                'config_type': config_type,  # Store configuration type
-                'delegation_mode': DelegationMode.UNLOCKED  # Will be set in _scroll_initialize
-            }
-            
-            # Store axis_config for mixed configurations
-            if axis_config:
-                touch.ud['nested']['axis_config'] = axis_config
-            
-            # Initialize scrolling on the inner child (handles coordinate transformation)
-            return self._initialize_nested_inner(touch, child_sv)
-        
-        # We're STANDALONE - no parent, no child ScrollView found
-        if self._scroll_initialize(touch):
-            # Only grab if we actually set up scroll state
-            uid = self._get_uid()
-            if uid in touch.ud:
-                # We set up scroll state - claim this touch to prevent multi-touch scrolling
-                self._nested_sv_active_touch = touch
-                touch.grab(self)
-            return True
-        return False
-
     def _touch_in_handle(self, pos, size, touch):
         # check if the touch is in the handle of the scrollview
         # thouching the handle allows the user to drag the scrollview
@@ -1486,80 +1413,6 @@ class ScrollView(StencilView):
         x, y = pos
         width, height = size
         return x <= touch.x <= x + width and y <= touch.y <= y + height
-
-    #
-    # TOUCH USER DATA (touch.ud) KEY DOCUMENTATION
-    # ============================================
-    # This section documents all touch.ud keys used across ScrollView,
-    # 
-    # KEY NAMING CONVENTIONS:
-    # ----------------------
-    # 
-    # PER-INSTANCE 'sv.' NAMESPACE:
-    # -----------------------------
-    # ScrollView uses 'sv.' prefixed keys via _get_uid() to create instance-specific
-    # keys like 'sv.123' where 123 is the widget's unique ID. Each ScrollView only
-    # checks its own keys - they do NOT share or coordinate via these keys.
-    #
-    # Per-ScrollView Instance Keys:
-    # - sv.<uid>: Primary state dict for this ScrollView instance
-    #   Contains: {
-    #     'mode': ScrollMode,   # State machine: UNKNOWN (detecting intent) -> SCROLL (confirmed)
-    #     'dx': float,          # accumulated absolute X movement for detection
-    #     'dy': float,          # accumulated absolute Y movement for detection  
-    #     'scroll_action': bool,# True if touch started in scrollbar (skips on_scroll_start dispatch)
-    #     'frames': int,        # Clock.frames at touch start (slow device timing)
-    #     'can_defocus': bool,  # Whether this touch can defocus focused widgets
-    #   }
-    #
-    # - svavoid.<uid>: Flag indicating this ScrollView should avoid handling this touch
-    #   Set when: Mouse wheel events are handled, or touch doesn't collide
-    #   Purpose: Prevents double-processing of already-handled touches
-    #
-    #   Note: Each widget (ScrollView, DragBehavior) has its own UID-namespaced svavoid key.
-    #         Widgets do NOT coordinate via svavoid - each checks only its own key.
-    #
-    # - claimed_by_child.<uid>: Flag indicating a child widget has claimed this touch
-    #   Set when: _change_touch_mode delegates touch to children (timeout expired)
-    #   Purpose: Prevents ScrollView from re-initializing scroll after child claimed touch
-    #   Used in: _scroll_initialize and _scroll_update to skip processing
-    #
-    # Cross-ScrollView Shared Keys:
-    # - sv.handled: dict {'x': bool, 'y': bool}
-    #   Purpose: Tracks which axes have been processed by a ScrollView
-    #   Lifecycle: Set at start of on_touch_move, updated during scroll processing
-    #
-    # - sv.can_defocus: bool
-    #   Purpose: Controls whether FocusBehavior should defocus on this touch
-    #   Set to False when: Touch results in actual scrolling
-    #   Used in: on_touch_up to prevent defocus after scroll gestures
-    #
-    # NESTED SCROLLVIEW NAMESPACE:
-    # ----------------------------
-    # - nested: dict - Auto-detected nested ScrollView coordination state
-    #   Contains: {
-    #     'outer': ScrollView instance,  # The outer (parent) ScrollView
-    #     'inner': ScrollView instance,  # The inner (child) ScrollView
-    #     'mode': str,  # 'inner' or 'outer' - which ScrollView currently handles this touch
-    #     'axis_config': dict (optional),  # For mixed XY cases: {
-    #                                      #   'outer_exclusive': list,  # axes only outer can scroll
-    #                                      #   'inner_exclusive': list,  # axes only inner can scroll
-    #                                      #   'shared': list            # axes both can scroll
-    #                                      # }
-    #     'delegation_mode': DelegationMode (optional)  # UNKNOWN, LOCKED, START_AT_BOUNDARY
-    #                                        # State machine for web-style delegation in parallel scrolling
-    #   }
-    #   Purpose: Routes touches between outer and inner ScrollViews
-    #   Lifecycle: Set in outer's on_touch_down, used throughout touch lifecycle
-    #
-    # GLOBAL SCROLLBAR FLAGS (No Namespacing Required):
-    # --------------------------------------------------
-    # - in_bar_x: bool - Touch started on horizontal scroll bar
-    # - in_bar_y: bool - Touch started on vertical scroll bar
-    #   Purpose: Differentiates bar dragging from content scrolling
-    #   Affects: Touch routing, effect handling, movement calculations, delegation
-    #   Rationale: Scroll bars are positioned at widget edges and cannot overlap,
-    #              so multiple ScrollViews can safely share these global flags
 
     def _check_scroll_bounds(self, touch):
         # Check if touch is within scrollable bounds and set in_bar flags.
@@ -1859,6 +1712,153 @@ class ScrollView(StencilView):
         
         if self.do_scroll_y and self.effect_y and not_in_bar:
             self.effect_y.stop(touch.y)
+
+    #
+    # TOUCH USER DATA (touch.ud) KEY DOCUMENTATION
+    # ============================================
+    # This section documents all touch.ud keys used across ScrollView,
+    #
+    # KEY NAMING CONVENTIONS:
+    # ----------------------
+    #
+    # PER-INSTANCE 'sv.' NAMESPACE:
+    # -----------------------------
+    # ScrollView uses 'sv.' prefixed keys via _get_uid() to create instance-specific
+    # keys like 'sv.123' where 123 is the widget's unique ID. Each ScrollView only
+    # checks its own keys - they do NOT share or coordinate via these keys.
+    #
+    # Per-ScrollView Instance Keys:
+    # - sv.<uid>: Primary state dict for this ScrollView instance
+    #   Contains: {
+    #     'mode': ScrollMode,   # State machine: UNKNOWN (detecting intent) -> SCROLL (confirmed)
+    #     'dx': float,          # accumulated absolute X movement for detection
+    #     'dy': float,          # accumulated absolute Y movement for detection
+    #     'scroll_action': bool,# True if touch started in scrollbar (skips on_scroll_start dispatch)
+    #     'frames': int,        # Clock.frames at touch start (slow device timing)
+    #     'can_defocus': bool,  # Whether this touch can defocus focused widgets
+    #   }
+    #
+    # - svavoid.<uid>: Flag indicating this ScrollView should avoid handling this touch
+    #   Set when: Mouse wheel events are handled, or touch doesn't collide
+    #   Purpose: Prevents double-processing of already-handled touches
+    #
+    #   Note: Each widget (ScrollView, DragBehavior) has its own UID-namespaced svavoid key.
+    #         Widgets do NOT coordinate via svavoid - each checks only its own key.
+    #
+    # - claimed_by_child.<uid>: Flag indicating a child widget has claimed this touch
+    #   Set when: _change_touch_mode delegates touch to children (timeout expired)
+    #   Purpose: Prevents ScrollView from re-initializing scroll after child claimed touch
+    #   Used in: _scroll_initialize and _scroll_update to skip processing
+    #
+    # Cross-ScrollView Shared Keys:
+    # - sv.handled: dict {'x': bool, 'y': bool}
+    #   Purpose: Tracks which axes have been processed by a ScrollView
+    #   Lifecycle: Set at start of on_touch_move, updated during scroll processing
+    #
+    # - sv.can_defocus: bool
+    #   Purpose: Controls whether FocusBehavior should defocus on this touch
+    #   Set to False when: Touch results in actual scrolling
+    #   Used in: on_touch_up to prevent defocus after scroll gestures
+    #
+    # NESTED SCROLLVIEW NAMESPACE:
+    # ----------------------------
+    # - nested: dict - Auto-detected nested ScrollView coordination state
+    #   Contains: {
+    #     'outer': ScrollView instance,  # The outer (parent) ScrollView
+    #     'inner': ScrollView instance,  # The inner (child) ScrollView
+    #     'mode': str,  # 'inner' or 'outer' - which ScrollView currently handles this touch
+    #     'axis_config': dict (optional),  # For mixed XY cases: {
+    #                                      #   'outer_exclusive': list,  # axes only outer can scroll
+    #                                      #   'inner_exclusive': list,  # axes only inner can scroll
+    #                                      #   'shared': list            # axes both can scroll
+    #                                      # }
+    #     'delegation_mode': DelegationMode (optional)  # UNKNOWN, LOCKED, START_AT_BOUNDARY
+    #                                        # State machine for web-style delegation in parallel scrolling
+    #   }
+    #   Purpose: Routes touches between outer and inner ScrollViews
+    #   Lifecycle: Set in outer's on_touch_down, used throughout touch lifecycle
+    #
+    # GLOBAL SCROLLBAR FLAGS (No Namespacing Required):
+    # --------------------------------------------------
+    # - in_bar_x: bool - Touch started on horizontal scroll bar
+    # - in_bar_y: bool - Touch started on vertical scroll bar
+    #   Purpose: Differentiates bar dragging from content scrolling
+    #   Affects: Touch routing, effect handling, movement calculations, delegation
+    #   Rationale: Scroll bars are positioned at widget edges and cannot overlap,
+    #              so multiple ScrollViews can safely share these global flags
+
+    # =========================================================================
+    # MAIN TOUCH HANDLING METHODS (in lifecycle order)
+    # =========================================================================
+
+    def on_touch_down(self, touch):
+        # SCROLLVIEW TOUCH HANDLING WITH AUTO-NESTED DETECTION
+        # =====================================================
+        # This method automatically detects nested ScrollView configurations and
+        # sets up coordination.
+
+        if not self.collide_point(*touch.pos):
+            return False
+
+        # Check if we already have an active nested ScrollView touch
+        # This prevents multiple ScrollViews from scrolling simultaneously
+        if self._nested_sv_active_touch is not None:
+            touch.ud[self._get_uid('svavoid')] = True
+            return False
+
+        # NESTED DETECTION via touch event flow:
+        # Parent widgets receive touches BEFORE children in Kivy.
+        # - If 'nested' NOT in touch.ud: We're the FIRST ScrollView to see this touch
+        #   (either outer or standalone - check for children below)
+        # - If 'nested' IN touch.ud: We're an INNER ScrollView
+        #   (parent already set up coordination - process as inner)
+
+        # Check if touch is on OUR scrollbar - if so, handle it directly (don't look for children)
+        # This ensures outer scrollbar works even when there are inner ScrollViews
+        in_bar_x, in_bar_y = self._check_scroll_bounds(touch)
+        if in_bar_x or in_bar_y:
+            # Touch is on our scrollbar - handle it directly
+            if self._scroll_initialize(touch):
+                touch.grab(self)
+                return True
+            return False
+
+        # We might be the outer ScrollView - check for child at touch position
+        child_sv = self._find_child_scrollview_at_touch(touch)
+
+        is_wheel = 'button' in touch.profile and touch.button.startswith('scroll')
+
+        if child_sv:
+            # We're the OUTER ScrollView with an INNER child
+            # Classify configuration once at touch down
+            config_type, axis_config = self._classify_nested_configuration(child_sv)
+
+            # Set up nested coordination with configuration type
+            touch.ud['nested'] = {
+                'outer': self,
+                'inner': child_sv,
+                'mode': 'inner',  # Start with inner handling touch
+                'config_type': config_type,  # Store configuration type
+                'delegation_mode': DelegationMode.UNLOCKED  # Will be set in _scroll_initialize
+            }
+
+            # Store axis_config for mixed configurations
+            if axis_config:
+                touch.ud['nested']['axis_config'] = axis_config
+
+            # Initialize scrolling on the inner child (handles coordinate transformation)
+            return self._initialize_nested_inner(touch, child_sv)
+
+        # We're STANDALONE - no parent, no child ScrollView found
+        if self._scroll_initialize(touch):
+            # Only grab if we actually set up scroll state
+            uid = self._get_uid()
+            if uid in touch.ud:
+                # We set up scroll state - claim this touch to prevent multi-touch scrolling
+                self._nested_sv_active_touch = touch
+                touch.grab(self)
+            return True
+        return False
 
     def _scroll_initialize(self, touch):
         # This is the first phase of the scroll gesture, call from on_touch_down
