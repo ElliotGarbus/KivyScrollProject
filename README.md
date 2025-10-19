@@ -55,7 +55,7 @@ to the inner and outer ScrollView.
 Things worked nicely, but I have decided to integrate the capabilities back into ScrollView, 
 rather than have two separate widgets.
 
- - updated_sv_no_manager.py - ScrollView with Nesting support
+ - scrollview.py - ScrollView with Nesting support
 
 Demonstrations/tests using the updated ScrollView: 
 - demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) 

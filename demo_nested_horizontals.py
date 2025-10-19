@@ -8,7 +8,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.metrics import dp
 
-from updated_sv_no_manager import ScrollView
+from scrollview import ScrollView
 
 
 class InnerScrollView(ScrollView):

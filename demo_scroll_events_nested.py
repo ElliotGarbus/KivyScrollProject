@@ -17,7 +17,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
-from updated_sv_no_manager import ScrollView
+from scrollview import ScrollView
 
 # ANSI color codes for terminal output
 class Colors:

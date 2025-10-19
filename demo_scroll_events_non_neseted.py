@@ -13,7 +13,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.spinner import Spinner
 from kivy.uix.button import Button
-from updated_sv_no_manager import ScrollView
+from scrollview import ScrollView
 
 
 class ScrollObserverApp(App):

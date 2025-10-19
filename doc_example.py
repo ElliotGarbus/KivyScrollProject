@@ -11,7 +11,7 @@ This example demonstrates:
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
-from updated_sv_no_manager import ScrollView
+from scrollview import ScrollView
 
 
 class NestedScrollApp(App):

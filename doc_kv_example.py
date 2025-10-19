@@ -11,7 +11,7 @@ This example demonstrates:
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.button import Button
-from updated_sv_no_manager import ScrollView
+from scrollview import ScrollView
 from kivy.properties import NumericProperty
 
 from kivy.factory import Factory
