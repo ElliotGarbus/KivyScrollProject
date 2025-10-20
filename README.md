@@ -1,11 +1,6 @@
-Updated implementation for ScrollView with 2 layer nesting support.
+Updated implementation for ScrollView with nesting support.
 
-An initial implementation is in the V0 Obsolete Directory
-
-My objective is to deliver a solution that is more maintainable and supports nesting.
-
-This implementation will support an outer ScrollView and one or more inner ScrollViews.  
-All combinations for do_scroll_x and do_scroll_y are supported for the inner and outer ScrollView.
+This is a WIP I want to enable ScrollView to support arbitrary levels of nesting.
 
 The on_scroll_events (on_scroll_start, on_scroll_move, and on_stroll_stop) have been updated.
 They now work as expected, firing when the movement starts, continues and stops.
@@ -51,9 +46,12 @@ parallel_delegation = BooleanProperty(True)
 
 Key files:
 Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollViewManger to route the touches 
-to the inner and outer ScrollView.
-Things worked nicely, but I have decided to integrate the capabilities back into ScrollView, 
-rather than have two separate widgets.
+to the inner and outer ScrollView. Things worked nicely, but I have decided to integrate the capabilities back into
+ScrollView, rather than have two separate widgets.
+
+Directory V1 Two Level Nesting - this version of ScrollView supports two levels of nesting, outer and inner.
+
+In the main directory I am working to support arbitary levels of nesting scrollview.
 
  - scrollview.py - ScrollView with Nesting support
 
