@@ -298,6 +298,102 @@ class DelegationMode(str, Enum):
 
 
 # =============================================================================
+# HIERARCHY MANAGEMENT CLASS
+# =============================================================================
+
+class ScrollViewHierarchy:
+    """Manages the hierarchy of nested ScrollViews for a touch gesture.
+    
+    Stores ScrollViews from outermost (index 0) to innermost (index n).
+    Each ScrollView can use its index to find its parent and navigate the chain.
+    
+    This class supports arbitrary depth nesting by maintaining:
+    - List of ScrollView instances from outer to inner
+    - Classification of each parent-child relationship
+    - Axis configuration for mixed cases
+    """
+    
+    def __init__(self, outer_sv):
+        """Initialize hierarchy with the outermost ScrollView.
+        
+        Args:
+            outer_sv: The outermost ScrollView in the hierarchy
+        """
+        self.scrollviews = [outer_sv]  # List from outer to inner
+        self.classifications = []       # Parent-child classifications
+        self.axis_configs = []          # Mixed axis configs (None for non-mixed)
+        self.touched_index = 0          # Index of ScrollView where touch started
+    
+    def add_child(self, child_sv, classification, axis_config=None):
+        """Add a child ScrollView to the hierarchy.
+        
+        Args:
+            child_sv: The child ScrollView to add
+            classification: 'orthogonal', 'parallel', or 'mixed'
+            axis_config: Dict with axis configuration (only for mixed)
+        """
+        self.scrollviews.append(child_sv)
+        self.classifications.append(classification)
+        self.axis_configs.append(axis_config)
+        self.touched_index = len(self.scrollviews) - 1
+    
+    def get_parent(self, current_index):
+        """Get parent ScrollView for given index.
+        
+        Args:
+            current_index: Index of the child ScrollView
+            
+        Returns:
+            Parent ScrollView, or None if at root (index 0)
+        """
+        if current_index > 0:
+            return self.scrollviews[current_index - 1]
+        return None
+    
+    def get_classification(self, child_index):
+        """Get classification between child and its parent.
+        
+        Args:
+            child_index: Index of the child ScrollView
+            
+        Returns:
+            Classification string ('orthogonal', 'parallel', 'mixed'),
+            or None if child_index is 0 (no parent)
+        """
+        if child_index > 0:
+            return self.classifications[child_index - 1]
+        return None
+    
+    def get_axis_config(self, child_index):
+        """Get axis configuration for mixed classification.
+        
+        Args:
+            child_index: Index of the child ScrollView
+            
+        Returns:
+            Axis config dict for mixed cases, or None
+        """
+        if child_index > 0:
+            return self.axis_configs[child_index - 1]
+        return None
+    
+    @property
+    def depth(self):
+        """Total depth of hierarchy (number of levels)."""
+        return len(self.scrollviews)
+    
+    @property
+    def outer(self):
+        """Outermost ScrollView (index 0)."""
+        return self.scrollviews[0]
+    
+    @property
+    def inner(self):
+        """Innermost ScrollView (last in list)."""
+        return self.scrollviews[-1]
+
+
+# =============================================================================
 # CONFIGURATION CONSTANTS
 # =============================================================================
 
@@ -972,6 +1068,50 @@ class ScrollView(StencilView):
                     return widget
         touch.pop()
         return None
+    
+    def _build_hierarchy_recursive(self, touch):
+        """Build complete ScrollView hierarchy from this (outer) to innermost.
+        
+        Recursively finds all nested ScrollViews under the touch point and
+        builds a ScrollViewHierarchy object with classifications for each
+        parent-child relationship.
+        
+        NOTE: This method is for FUTURE arbitrary nesting support. Currently
+        NOT USED - the 2-level nesting system uses _find_child_scrollview_at_touch.
+        Will be integrated in Phase 2 of arbitrary nesting implementation.
+        
+        Args:
+            touch: The touch event
+            
+        Returns:
+            ScrollViewHierarchy or None: Complete hierarchy from this (outer) 
+                                        to innermost, or None if no children
+        """
+        # Find immediate child
+        child_sv = self._find_child_scrollview_at_touch(touch)
+        
+        if not child_sv:
+            return None
+        
+        # Start building hierarchy with self as outer
+        hierarchy = ScrollViewHierarchy(self)
+        
+        # Recursively build the chain
+        current_sv = child_sv
+        parent_sv = self
+        
+        while current_sv:
+            # Classify this parent-child relationship
+            config_type, axis_config = parent_sv._classify_nested_configuration(current_sv)
+            
+            # Add to hierarchy
+            hierarchy.add_child(current_sv, config_type, axis_config)
+            
+            # Look for next level down
+            parent_sv = current_sv
+            current_sv = current_sv._find_child_scrollview_at_touch(touch)
+        
+        return hierarchy
     
     def _get_primary_scroll_axis(self, touch):
         # Determine which axis has dominant touch movement.
