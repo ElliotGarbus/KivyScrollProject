@@ -1348,8 +1348,8 @@ class ScrollView(StencilView):
                     # Regular touch: outer grabs, inner tracks the touch
                     touch.grab(self)
                     child_sv._touch = touch
-                self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
-                # Wheel events are handled immediately, no grab/touch tracking needed
+                    self._nested_sv_active_touch = touch  # Store the active touch for nested scenario
+                    # Wheel events are handled immediately, no grab/touch tracking needed
             # Return True whether inner scrolled or delegated to child widget
             return True
         
@@ -1370,64 +1370,87 @@ class ScrollView(StencilView):
     # They are organized by purpose: detection, delegation, intent, finalization.
     
     def _setup_boundary_delegation(self, touch, in_bar):
-        # Configure web-style boundary delegation for parallel nested scrolling.
-        # 
-        # In parallel nested setups (both scrolling same direction), detects if
-        # touch starts at inner ScrollView's scroll boundary. If so, marks the
-        # touch for immediate delegation to outer on first movement away from boundary.
-        # 
-        # Only applies when:
-        # - Touch is in a nested configuration
-        # - Not in a scrollbar (delegation disabled for bars)
-        # - outer.parallel_delegation is True
-        # 
-        # Args:
-        #     touch: The touch event with touch.ud['nested'] already set
-        #     in_bar: Whether touch is in a scrollbar
+        """Configure web-style boundary delegation for parallel nested scrolling.
         
+        In parallel nested setups (both scrolling same direction), detects if
+        touch starts at this ScrollView's scroll boundary. If so, marks for
+        immediate delegation to parent on first movement away from boundary.
+        
+        For arbitrary depth: Uses hierarchy to find immediate parent, not always outer.
+        
+        Only applies when:
+        - Touch is in a nested configuration
+        - Not in a scrollbar (delegation disabled for bars)
+        - parent.parallel_delegation is True
+        
+        Args:
+            touch: The touch event with touch.ud['nested'] already set
+            in_bar: Whether touch is in a scrollbar
+        """
         if 'nested' not in touch.ud or in_bar:
             return
         
-        outer = touch.ud['nested']['outer']
-
-        # Only proceed if outer has parallel_delegation enabled
-        if not outer or not outer.parallel_delegation:
+        # For arbitrary depth: find our immediate parent from hierarchy
+        hierarchy, my_index, parent_sv = self._get_nested_data(touch)
+        
+        if not parent_sv:
+            # We're the outer or not in hierarchy - no delegation needed
+            return
+        
+        # Only proceed if parent has parallel_delegation enabled
+        if not parent_sv.parallel_delegation:
             return
         
         # PARALLEL DELEGATION: Only check boundaries in directions where BOTH
-        # inner and outer scroll. In orthogonal setups (inner scrolls Y, outer scrolls X),
-        # the inner should freely overscroll in Y direction without delegation.
+        # child and parent scroll. In orthogonal setups (child scrolls Y, parent scrolls X),
+        # the child should freely overscroll in Y direction without delegation.
         
-        # Check X boundary only if both inner and outer scroll horizontally
-        at_boundary_x = (self.do_scroll_x and outer.do_scroll_x and 
+        # Check X boundary only if both child and parent scroll horizontally
+        at_boundary_x = (self.do_scroll_x and parent_sv.do_scroll_x and 
                         self._is_at_scroll_boundary('x'))
         
-        # Check Y boundary only if both inner and outer scroll vertically
-        at_boundary_y = (self.do_scroll_y and outer.do_scroll_y and 
+        # Check Y boundary only if both child and parent scroll vertically
+        at_boundary_y = (self.do_scroll_y and parent_sv.do_scroll_y and 
                         self._is_at_scroll_boundary('y'))
             
         # Set delegation_mode based on boundary state in PARALLEL directions only
+        # For arbitrary depth: Store per-ScrollView delegation mode using UID
         if at_boundary_x or at_boundary_y:
+            # Store per-ScrollView delegation mode
+            sv_uid = self._get_uid()
+            if 'delegation_modes' not in touch.ud['nested']:
+                touch.ud['nested']['delegation_modes'] = {}
+            touch.ud['nested']['delegation_modes'][sv_uid] = DelegationMode.START_AT_BOUNDARY
+            
+            # Also set global mode for backward compatibility with 2-level code
             touch.ud['nested']['delegation_mode'] = DelegationMode.START_AT_BOUNDARY
     
-    def _delegate_to_outer_scroll(self, touch, inner):
-        # Switch scrolling from inner to outer ScrollView during touch move.
-        # 
-        # Called when inner ScrollView rejects touch movement (e.g., orthogonal
-        # gesture or boundary reached). Initializes outer's scroll state and
-        # takes over scroll handling.
-        # 
-        # Args:
-        #     touch: The touch event
-        #     inner: The inner ScrollView that is relinquishing control
+    def _delegate_to_parent_scroll(self, touch, child_sv, parent_sv):
+        """Delegate scrolling from child to parent ScrollView in hierarchy chain.
         
-        # Update mode to indicate outer is now handling
-        touch.ud['nested']['mode'] = 'outer'
+        Called when a child ScrollView rejects touch movement (e.g., orthogonal
+        gesture, boundary reached, or delegation decision). Initializes parent's
+        scroll state and takes over scroll handling.
         
-        # Initialize outer's scroll state if not already set up
-        outer_uid = self._get_uid()
-        if outer_uid not in touch.ud:
-            touch.ud[outer_uid] = {
+        This supports arbitrary depth by delegating to immediate parent, which
+        can then delegate to ITS parent if needed.
+        
+        Args:
+            touch: The touch event
+            child_sv: The child ScrollView that is relinquishing control
+            parent_sv: The parent ScrollView that will take over
+            
+        Returns:
+            bool: Result from parent's _scroll_update
+        """
+        # Update mode for backward compatibility (2-level code)
+        if parent_sv is touch.ud['nested'].get('outer'):
+            touch.ud['nested']['mode'] = 'outer'
+        
+        # Initialize parent's scroll state if not already set up
+        parent_uid = parent_sv._get_uid()
+        if parent_uid not in touch.ud:
+            touch.ud[parent_uid] = {
                 'mode': ScrollMode.SCROLL,  # Already scrolling (not UNKNOWN)
                 'dx': 0,
                 'dy': 0,
@@ -1435,15 +1458,15 @@ class ScrollView(StencilView):
                 'frames': 0,
                 'can_defocus': False,
             }
-            self._initialize_scroll_effects(touch, in_bar=False)
-            self._touch = touch
-            self.dispatch('on_scroll_start')
-            if inner:
-                inner._touch = None
+            parent_sv._initialize_scroll_effects(touch, in_bar=False)
+            parent_sv._touch = touch
+            parent_sv.dispatch('on_scroll_start')
+            if child_sv:
+                child_sv._touch = None
         
-        # Now process the touch movement with outer
+        # Now process the touch movement with parent
         touch.ud['sv.handled'] = {'x': False, 'y': False}
-        return self._scroll_update(touch)
+        return parent_sv._scroll_update(touch)
     
     def _handle_nested_inner_move(self, touch, inner):
         # Handle touch movement when inner ScrollView is active in nested setup.
@@ -1473,7 +1496,8 @@ class ScrollView(StencilView):
         
         # If inner rejected (orthogonal delegation), switch to outer
         if not result:
-            return self._delegate_to_outer_scroll(touch, inner)
+            # For 2-level: delegate to outer (self)
+            return self._delegate_to_parent_scroll(touch, inner, self)
         return result
     
     def _handle_nested_outer_move(self, touch, inner):
@@ -1534,40 +1558,61 @@ class ScrollView(StencilView):
         return True
     
     def _check_nested_delegation(self, touch, not_in_bar):
-        # Check if inner ScrollView should delegate to outer using config_type.
-        # 
-        # Configuration type was determined once at touch_down, eliminating 
-        # redundant checking on every touch_move.
-        # 
-        # Only applies to inner ScrollViews scrolling content (not scrollbars).
-        # 
-        # Args:
-        #     touch: The touch event
-        #     not_in_bar: Whether touch is NOT in a scrollbar
-        # 
-        # Returns:
-        #     bool: True if should delegate to outer (return False from _scroll_update),
-        #           False if inner should continue handling
+        """Check if this ScrollView should delegate to its parent in hierarchy.
         
-        # Only check delegation for inner ScrollViews scrolling content
+        Uses the hierarchy to find this ScrollView's relationship with its parent
+        and calls the appropriate delegation method. Supports arbitrary depth.
+        
+        Only applies to ScrollViews scrolling content (not scrollbars).
+        
+        Args:
+            touch: The touch event
+            not_in_bar: Whether touch is NOT in a scrollbar
+        
+        Returns:
+            bool: True if should delegate to parent (return False from _scroll_update),
+                  False if should continue handling
+        """
+        # Only check delegation for nested ScrollViews scrolling content
         if 'nested' not in touch.ud:
-            return False
-        if touch.ud['nested']['mode'] != 'inner':
             return False
         if not not_in_bar:
             return False
         
-        # Use pre-determined configuration type to dispatch to correct delegation method
-        config_type = touch.ud['nested']['config_type']
+        # Get hierarchy and find our position
+        hierarchy, my_index, parent_sv = self._get_nested_data(touch)
         
-        if config_type == 'orthogonal':
-            return self._should_delegate_orthogonal(touch)
-        elif config_type == 'mixed':
-            return self._should_delegate_mixed(touch)
-        elif config_type == 'parallel':
-            return self._should_delegate_parallel(touch)
+        if not hierarchy or parent_sv is None:
+            return False  # Not nested or we're the outer - no delegation
         
-        return False  # Inner continues handling
+        # Only check delegation if we're the CURRENT handler in the hierarchy
+        # For arbitrary depth: check current_index
+        # For 2-level: check mode (backward compatibility)
+        if 'current_index' in touch.ud['nested']:
+            # New hierarchy-based routing: only delegate if we're the current handler
+            if my_index != touch.ud['nested']['current_index']:
+                return False  # Not our turn to handle, don't delegate
+        elif 'mode' in touch.ud['nested']:
+            # Old 2-level routing: check mode for backward compatibility
+            if touch.ud['nested']['mode'] != 'inner':
+                return False
+        else:
+            # No routing info - shouldn't happen but be safe
+            return False
+        
+        # Get our relationship with immediate parent
+        classification = hierarchy.get_classification(my_index)
+        axis_config = hierarchy.get_axis_config(my_index)
+        
+        # Dispatch to appropriate delegation method based on classification
+        if classification == 'orthogonal':
+            return self._should_delegate_orthogonal(touch, parent_sv)
+        elif classification == 'mixed':
+            return self._should_delegate_mixed(touch, parent_sv, axis_config)
+        elif classification == 'parallel':
+            return self._should_delegate_parallel(touch, parent_sv)
+        
+        return False
     
     def _handle_focus_behavior(self, touch, uid_key):
         # Handle focus behavior after scroll finalization.
@@ -1762,38 +1807,50 @@ class ScrollView(StencilView):
             self._effect_y_start_height = self.height
             self.effect_y.start(touch.y)
 
-    def _should_delegate_orthogonal(self, touch):
-        # Check if touch movement is orthogonal to scroll direction.
-        # 
-        # Only called for orthogonal configurations (config_type already verified).
-        # Delegates when movement is in a direction inner can't handle but outer can.
+    def _should_delegate_orthogonal(self, touch, parent_sv):
+        """Check if touch movement is orthogonal to scroll direction.
         
-        outer = touch.ud['nested']['outer']
+        Only called for orthogonal configurations (classification already verified).
+        Delegates when movement is in a direction child can't handle but parent can.
+        
+        Args:
+            touch: The touch event
+            parent_sv: The parent ScrollView in the hierarchy
+            
+        Returns:
+            bool: True if should delegate to parent
+        """
         abs_dx = abs(touch.dx)
         abs_dy = abs(touch.dy)
         
         # Only delegate if movement is SIGNIFICANTLY orthogonal (2x threshold to avoid noise)
-        # AND outer scrollview CAN scroll in that direction
+        # AND parent scrollview CAN scroll in that direction
         
-        # Horizontal movement that inner can't handle, but outer can
-        if abs_dx > abs_dy * 2 and not self.do_scroll_x and outer.do_scroll_x:
+        # Horizontal movement that child can't handle, but parent can
+        if abs_dx > abs_dy * 2 and not self.do_scroll_x and parent_sv.do_scroll_x:
             return True
         
-        # Vertical movement that inner can't handle, but outer can
-        if abs_dy > abs_dx * 2 and not self.do_scroll_y and outer.do_scroll_y:
+        # Vertical movement that child can't handle, but parent can
+        if abs_dy > abs_dx * 2 and not self.do_scroll_y and parent_sv.do_scroll_y:
             return True
 
         return False
 
-    def _should_delegate_mixed(self, touch):
-        # Check if touch should be delegated in mixed nested configurations.
-        # 
-        # Only called for mixed configurations (config_type already verified).
-        # Handles ONLY outer-exclusive and inner-exclusive axes.
-        # Shared axes use the same boundary logic as parallel cases.
-
-        config = touch.ud['nested']['axis_config']
+    def _should_delegate_mixed(self, touch, parent_sv, axis_config):
+        """Check if touch should be delegated in mixed nested configurations.
         
+        Only called for mixed configurations (classification already verified).
+        Handles parent-exclusive and child-exclusive axes.
+        Shared axes use the same boundary logic as parallel cases.
+        
+        Args:
+            touch: The touch event
+            parent_sv: The parent ScrollView in the hierarchy
+            axis_config: Dictionary with axis configuration
+            
+        Returns:
+            bool: True if should delegate to parent
+        """
         # Calculate total movement since touch_down
         total_dx = touch.x - touch.ox
         total_dy = touch.y - touch.oy
@@ -1808,72 +1865,106 @@ class ScrollView(StencilView):
         is_horizontal_dominant = abs_dx > abs_dy
         is_vertical_dominant = abs_dy > abs_dx
         
-        # Check outer-exclusive axes (immediate delegation)
-        if is_horizontal_dominant and 'x' in config['outer_exclusive']:
+        # Check parent-exclusive axes (immediate delegation)
+        # Note: Changed from 'outer_exclusive' to 'outer_exclusive' for backward compatibility
+        outer_exclusive = axis_config.get('outer_exclusive', [])
+        if is_horizontal_dominant and 'x' in outer_exclusive:
             return True
-        if is_vertical_dominant and 'y' in config['outer_exclusive']:
+        if is_vertical_dominant and 'y' in outer_exclusive:
             return True
         
-        # Check inner-exclusive axes (no delegation, inner continues)
-        if is_horizontal_dominant and 'x' in config['inner_exclusive']:
+        # Check child-exclusive axes (no delegation, child continues)
+        # Note: Changed from 'inner_exclusive' to 'inner_exclusive' for backward compatibility
+        inner_exclusive = axis_config.get('inner_exclusive', [])
+        if is_horizontal_dominant and 'x' in inner_exclusive:
             return False
-        if is_vertical_dominant and 'y' in config['inner_exclusive']:
+        if is_vertical_dominant and 'y' in inner_exclusive:
             return False
         
         # Shared axes: use parallel boundary delegation logic
         # Call _should_delegate_parallel for shared axes (same behavior as parallel cases)
-        return self._should_delegate_parallel(touch)
+        return self._should_delegate_parallel(touch, parent_sv)
 
-    def _should_delegate_parallel(self, touch):
-        # Check if scroll should lock at boundary for parallel scrolling.
-        # 
-        # Only called for parallel configurations (config_type already verified).
-        # Also used for SHARED AXES in MIXED cases.
-        # 
-        # Implements web-style boundary locking based on delegation_mode:
-        #
-        # Returns True if inner scrollview should stop scrolling (locked state).
-        # Does NOT cause delegation to outer - that only happens on NEW touch.
+    def _should_delegate_parallel(self, touch, parent_sv):
+        """Check if scroll should lock at boundary for parallel scrolling.
         
-        outer = touch.ud['nested']['outer']
-        if not outer.parallel_delegation:
+        Only called for parallel configurations (classification already verified).
+        Also used for SHARED AXES in MIXED cases.
+        
+        Implements web-style boundary locking based on delegation_mode:
+        Returns True if child scrollview should stop scrolling (locked state).
+        Does NOT cause delegation to parent - that only happens on NEW touch.
+        
+        Args:
+            touch: The touch event
+            parent_sv: The parent ScrollView in the hierarchy
+            
+        Returns:
+            bool: True if should lock (stop scrolling but don't delegate)
+        """
+        if not parent_sv.parallel_delegation:
             return False
         
-        delegation_mode = touch.ud['nested']['delegation_mode']
+        # Get per-ScrollView delegation mode (arbitrary depth support)
+        sv_uid = self._get_uid()
+        delegation_modes = touch.ud['nested'].get('delegation_modes', {})
+        
+        # For arbitrary depth: use per-ScrollView mode (default UNLOCKED if not set)
+        # For 2-level backward compat: use global mode if no per-SV modes exist
+        if delegation_modes:
+            # We have per-ScrollView modes (arbitrary depth) - use ours or default to UNLOCKED
+            delegation_mode = delegation_modes.get(sv_uid, DelegationMode.UNLOCKED)
+        else:
+            # No per-ScrollView modes (2-level legacy) - use global mode
+            delegation_mode = touch.ud['nested'].get('delegation_mode', DelegationMode.UNLOCKED)
         
         # If not in delegation mode, never lock
         if delegation_mode == DelegationMode.UNLOCKED:
             return False
         
-        # If already locked, keep it locked (inner doesn't scroll, stays locked for this gesture)
+        # If already locked, keep it locked (child doesn't scroll, stays locked for this gesture)
         if delegation_mode == DelegationMode.LOCKED:
             return True
         
         # delegation_mode == START_AT_BOUNDARY
-        # Check if we're trying to scroll beyond the boundary OR moved away into content
+        # Web-style: Started at boundary, now check movement direction
         primary_axis = self._get_primary_scroll_axis(touch)
         
         if primary_axis == 'x' and self.do_scroll_x:  # Horizontal scrolling
+            at_boundary = self._is_at_scroll_boundary('x')
+            scrolling_beyond = self._is_scrolling_beyond_boundary('x', touch)
+            
             # Check if we've moved away from the boundary into content
-            if not self._is_at_scroll_boundary('x'):
+            if not at_boundary:
+                # Moved away from boundary into content - UNLOCK for this gesture
+                sv_uid = self._get_uid()
+                if 'delegation_modes' in touch.ud['nested']:
+                    touch.ud['nested']['delegation_modes'][sv_uid] = DelegationMode.UNLOCKED
                 touch.ud['nested']['delegation_mode'] = DelegationMode.UNLOCKED
                 return False
             
-            # Check if trying to scroll beyond boundary
-            if self._is_scrolling_beyond_boundary('x', touch):
-                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
-                return True
+            # Still at boundary - check if trying to scroll beyond
+            if scrolling_beyond:
+                # Trying to overscroll - DELEGATE to parent (chain delegation)
+                return True  # Delegate to parent
                 
         elif primary_axis == 'y' and self.do_scroll_y:  # Vertical scrolling
+            at_boundary = self._is_at_scroll_boundary('y')
+            scrolling_beyond = self._is_scrolling_beyond_boundary('y', touch)
+            
             # Check if we've moved away from the boundary into content
-            if not self._is_at_scroll_boundary('y'):
+            if not at_boundary:
+                # Moved away from boundary into content - UNLOCK for this gesture
+                sv_uid = self._get_uid()
+                if 'delegation_modes' in touch.ud['nested']:
+                    touch.ud['nested']['delegation_modes'][sv_uid] = DelegationMode.UNLOCKED
                 touch.ud['nested']['delegation_mode'] = DelegationMode.UNLOCKED
                 return False
             
-            # Check if trying to scroll beyond boundary
-            if self._is_scrolling_beyond_boundary('y', touch):
-                touch.ud['nested']['delegation_mode'] = DelegationMode.LOCKED
-                return True
+            # Still at boundary - check if trying to scroll beyond
+            if scrolling_beyond:
+                # Trying to overscroll - DELEGATE to parent (chain delegation)
+                return True  # Delegate to parent
         
         return False
 
@@ -2040,6 +2131,8 @@ class ScrollView(StencilView):
             # We're the OUTER ScrollView with nested children
             # hierarchy.depth >= 2 (self + at least one child)
             
+            
+            
             # For backward compatibility with 2-level code, extract outer/inner
             outer_sv = hierarchy.outer
             inner_sv = hierarchy.inner  # Innermost (deepest) ScrollView
@@ -2068,7 +2161,31 @@ class ScrollView(StencilView):
                 touch.ud['nested']['axis_config'] = axis_config
 
             # Initialize scrolling on the innermost child (handles coordinate transformation)
-            return self._initialize_nested_inner(touch, inner_sv)
+            result = self._initialize_nested_inner(touch, inner_sv)
+            
+            # After initialization, setup delegation modes for ALL ScrollViews in hierarchy
+            # (The innermost already had its mode set by _setup_boundary_delegation in _scroll_initialize)
+            # Now check the other levels in the hierarchy
+            if result and 'nested' in touch.ud:
+                for i in range(1, hierarchy.depth - 1):  # Skip outer (0) and innermost (already done)
+                    child_sv = hierarchy.scrollviews[i]
+                    parent_sv = hierarchy.scrollviews[i - 1]
+                    
+                    # Only check if parent has parallel_delegation enabled
+                    if parent_sv.parallel_delegation:
+                        # Check if child is at boundary in parallel directions
+                        at_boundary_x = (child_sv.do_scroll_x and parent_sv.do_scroll_x and 
+                                        child_sv._is_at_scroll_boundary('x'))
+                        at_boundary_y = (child_sv.do_scroll_y and parent_sv.do_scroll_y and 
+                                        child_sv._is_at_scroll_boundary('y'))
+                        
+                        if at_boundary_x or at_boundary_y:
+                            child_uid = child_sv._get_uid()
+                            if 'delegation_modes' not in touch.ud['nested']:
+                                touch.ud['nested']['delegation_modes'] = {}
+                            touch.ud['nested']['delegation_modes'][child_uid] = DelegationMode.START_AT_BOUNDARY
+            
+            return result
 
         # We're STANDALONE - no parent, no child ScrollView found
         if self._scroll_initialize(touch):
@@ -2176,28 +2293,106 @@ class ScrollView(StencilView):
         return True
 
     def on_touch_move(self, touch):
-        # SCROLLVIEW TOUCH HANDLING WITH NESTED COORDINATION
-        # ===================================================
+        # SCROLLVIEW TOUCH HANDLING WITH ARBITRARY DEPTH HIERARCHY
+        # =========================================================
         # Handles both standalone and nested ScrollView configurations.
-        # For nested setups, coordinates delegation between inner and outer.
+        # For nested setups (2+ levels), uses hierarchy and current_index to
+        # route touches to the correct ScrollView in the chain.
         
-        # NESTED COORDINATION: Check if we're the outer ScrollView
+        
+        # NESTED COORDINATION: Check if we have hierarchy data
         nested_data = touch.ud.get('nested')
-        if nested_data and nested_data['outer'] == self:
-            # We're the OUTER ScrollView coordinating with an INNER
-            if touch.grab_current is not self:
-                return True  # Touch grabbed by something else
+        if nested_data and 'hierarchy' in nested_data:
+            hierarchy = nested_data['hierarchy']
+            current_index = nested_data['current_index']
             
-            mode = nested_data['mode']
-            inner = nested_data['inner']
             
-            if mode == 'inner' and inner:
-                # Inner is active - delegate with coordinate transformation
-                return self._handle_nested_inner_move(touch, inner)
-            elif mode == 'outer':
-                # Outer is active - process normally
-                return self._handle_nested_outer_move(touch, inner)
-            return True
+            # Only the OUTER ScrollView coordinates the hierarchy
+            if hierarchy.outer is not self:
+                return True  # Not our job to coordinate
+            
+            # We're the outer - we coordinate regardless of grab state
+            # The hierarchy structure itself determines our role, not the grab
+            
+            # Get the ScrollView that should handle this touch
+            current_sv = hierarchy.scrollviews[current_index]
+            
+            # Check if child widget claimed the touch
+            if current_sv._get_uid('claimed_by_child') in touch.ud:
+                return True
+            
+            # Route to current handler
+            if current_sv is self:
+                # We (outer) are handling - process normally
+                touch.ud['sv.handled'] = {'x': False, 'y': False}
+                return self._scroll_update(touch)
+            else:
+                # Another ScrollView in hierarchy is handling
+                # Transform and delegate to it
+                # Loop to handle cascading delegation up the chain
+                while True:
+                    current_sv = hierarchy.scrollviews[current_index]
+                    
+                    touch.ud['sv.handled'] = {'x': False, 'y': False}
+                    touch.push()
+                    touch.apply_transform_2d(current_sv.parent.to_widget)
+                    result = current_sv._scroll_update(touch)
+                    touch.pop()
+                    
+                    # If current ScrollView accepted, we're done
+                    if result:
+                        return True
+                    
+                    # Current ScrollView rejected - cascade up the chain
+                    # The _should_delegate_* methods already handle boundary logic and return True/False
+                    # If they return True (delegate), we should cascade regardless of mode
+                    if current_index > 0:
+                        # Move up to parent in chain
+                        child_sv = current_sv
+                        current_index -= 1
+                        nested_data['current_index'] = current_index
+                        parent_sv = hierarchy.scrollviews[current_index]
+                        
+                        # Initialize parent's scroll state if not already set up
+                        parent_uid = parent_sv._get_uid()
+                        if parent_uid not in touch.ud:
+                            # Set to UNKNOWN so parent can detect scroll intent on next move
+                            touch.ud[parent_uid] = {
+                                'mode': ScrollMode.UNKNOWN,
+                                'dx': 0,
+                                'dy': 0,
+                                'scroll_action': False,
+                                'frames': 0,
+                                'can_defocus': False,
+                            }
+                            # Transform touch to parent's space before initializing effects
+                            touch.push()
+                            touch.apply_transform_2d(parent_sv.parent.to_widget)
+                            parent_sv._initialize_scroll_effects(touch, in_bar=False)
+                            touch.pop()
+                            
+                            parent_sv._touch = touch
+                            parent_sv.dispatch('on_scroll_start')
+                            child_sv._touch = None
+                            
+                            # Update mode for backward compatibility (2-level code)
+                            if parent_sv is hierarchy.outer:
+                                touch.ud['nested']['mode'] = 'outer'
+                            
+                            # Parent just initialized - return True and let next touch_move handle it
+                            # This prevents immediate cascading in the same event
+                            return True
+                        
+                        # Parent already initialized - try it now (continue loop)
+                        # Update mode for backward compatibility (2-level code)
+                        if parent_sv is hierarchy.outer:
+                            touch.ud['nested']['mode'] = 'outer'
+                        
+                        # Continue loop to try parent
+                        continue
+                    else:
+                        # At outer level and it rejected - shouldn't happen but return False
+                        return False
         
         # STANDALONE: Standard single-touch processing
         # Only process our designated touch
@@ -2240,6 +2435,7 @@ class ScrollView(StencilView):
         
         # Detect scroll intent (unknown -> scroll mode transition)
         ud = touch.ud[uid]
+        
         if ud['mode'] == ScrollMode.UNKNOWN:
             if not self._detect_scroll_intent(touch, ud):
                 return False
@@ -2258,21 +2454,40 @@ class ScrollView(StencilView):
         return True
 
     def on_touch_up(self, touch):
-        # SCROLLVIEW TOUCH HANDLING WITH NESTED COORDINATION
-        # ===================================================
+        # SCROLLVIEW TOUCH HANDLING WITH ARBITRARY DEPTH HIERARCHY
+        # =========================================================
         # Handles touch release for both standalone and nested configurations.
+        # For nested setups (2+ levels), uses current_index to finalize the
+        # correct ScrollView in the chain.
         
-        # NESTED COORDINATION: Check if we're the outer ScrollView
+        # NESTED COORDINATION: Check if we have hierarchy data
         nested_data = touch.ud.get('nested')
-        if nested_data and nested_data['outer'] == self:
-            mode = nested_data['mode']
-            inner = nested_data['inner']
+        if nested_data and 'hierarchy' in nested_data:
+            hierarchy = nested_data['hierarchy']
+            current_index = nested_data['current_index']
             
-            # Finalize whichever ScrollView was handling the gesture
-            if mode == 'inner' and inner:
-                self._finalize_nested_inner(touch, inner)
-            elif mode == 'outer':
-                self._finalize_nested_outer(touch)
+            # Only the OUTER ScrollView coordinates
+            if hierarchy.outer is not self:
+                return True  # Not our job to coordinate
+            
+            # Get the ScrollView that was handling this touch
+            current_sv = hierarchy.scrollviews[current_index]
+            
+            # Finalize the current handler
+            if current_sv is self:
+                # We (outer) were handling - finalize normally
+                self._scroll_finalize(touch)
+                self._handle_focus_behavior(touch, self._get_uid())
+            else:
+                # Another ScrollView in hierarchy was handling
+                # Transform and finalize it
+                current_uid = current_sv._get_uid()
+                if current_uid in touch.ud:
+                    touch.push()
+                    touch.apply_transform_2d(current_sv.parent.to_widget)
+                    current_sv._scroll_finalize(touch)
+                    touch.pop()
+                    self._handle_focus_behavior(touch, current_uid)
             
             # Clear the nested ScrollView active touch (outer only)
             if self._nested_sv_active_touch is touch:
