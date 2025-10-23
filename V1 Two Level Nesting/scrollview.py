@@ -1232,10 +1232,10 @@ class ScrollView(StencilView):
             self._touch = touch
             self.dispatch('on_scroll_start')
             if inner:
-                inner._touch = None
-                # CRITICAL: Stop inner's scroll effects when cascading
-                # Without this, inner effects remain active causing stuck scroll
-                inner._stop_scroll_effects(touch, not_in_bar=True)
+                # CRITICAL: Finalize inner's scroll when cascading
+                # This stops effects AND schedules on_scroll_stop event
+                # But doesn't interfere with normal on_touch_up to buttons/widgets
+                inner._finalize_scroll_for_cascade(touch)
         
         # Now process the touch movement with outer
         touch.ud['sv.handled'] = {'x': False, 'y': False}
@@ -1715,6 +1715,43 @@ class ScrollView(StencilView):
         
         if self.do_scroll_y and self.effect_y and not_in_bar:
             self.effect_y.stop(touch.y)
+    
+    def _finalize_scroll_for_cascade(self, touch):
+        """Finalize scroll when cascading to parent, without interfering with touch_up.
+        
+        This stops effects and schedules on_scroll_stop, but doesn't handle
+        click passthrough or other finalization that might interfere with
+        the normal on_touch_up flow to child widgets (like buttons).
+        
+        Called during on_touch_move when delegating from child to parent.
+        """
+        # Get scroll state
+        uid = self._get_uid()
+        if uid not in touch.ud:
+            return  # Never initialized, nothing to finalize
+        
+        ud = touch.ud[uid]
+        
+        # Stop scroll effects (prevent stuck scroll)
+        not_in_bar = not touch.ud.get('in_bar_x', False) and not touch.ud.get('in_bar_y', False)
+        self._stop_scroll_effects(touch, not_in_bar)
+        
+        # Schedule velocity check for on_scroll_stop event
+        if ud['mode'] == ScrollMode.SCROLL or ud.get('scroll_action'):
+            if self._velocity_check_ev:
+                self._velocity_check_ev.cancel()
+            self._velocity_check_ev = Clock.schedule_interval(
+                self._check_velocity_for_stop, 1/60.0)
+        
+        # Update effect bounds
+        ev = self._update_effect_bounds_ev
+        if ev is None:
+            ev = self._update_effect_bounds_ev = Clock.create_trigger(
+                self._update_effect_bounds)
+        ev()
+        
+        # NOTE: We do NOT handle click passthrough here because the actual
+        # on_touch_up will come later and needs to reach child widgets
 
     #
     # TOUCH USER DATA (touch.ud) KEY DOCUMENTATION
