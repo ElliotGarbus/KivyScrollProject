@@ -12,9 +12,11 @@ Structure:
 Expected Behavior:
 1. Horizontal scroll on inner -> scrolls inner (red)
 2. Vertical scroll on inner -> delegates to middle (green) - inner can't handle vertical
-3. Horizontal scroll on middle -> delegates to outer (blue) - middle can't handle horizontal
-4. Vertical scroll on middle -> scrolls middle (green)
-5. Both directions work on outer (blue)
+3. Middle scrolls vertically
+4. Horizontal scroll on middle -> delegates to outer (blue) - middle can't handle horizontal
+5. Outer scrolls in both directions
+Note: Middle hitting vertical boundary currently doesn't delegate to outer (same as V->H->V).
+See Phase 8 for planned enhancement.
 """
 
 from kivy.app import App
