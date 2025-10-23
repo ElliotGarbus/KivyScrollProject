@@ -1233,6 +1233,9 @@ class ScrollView(StencilView):
             self.dispatch('on_scroll_start')
             if inner:
                 inner._touch = None
+                # CRITICAL: Stop inner's scroll effects when cascading
+                # Without this, inner effects remain active causing stuck scroll
+                inner._stop_scroll_effects(touch, not_in_bar=True)
         
         # Now process the touch movement with outer
         touch.ud['sv.handled'] = {'x': False, 'y': False}
