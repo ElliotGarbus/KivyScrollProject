@@ -73,7 +73,6 @@ class InnerTextInputScrollView(ScrollView):
             
             # The TextInput itself
             text_input = TextInput(
-                text=f"Panel{panel_index + 1}_Input{j}",
                 size_hint_y=None,
                 height=dp(25),
                 multiline=False,

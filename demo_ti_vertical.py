@@ -80,7 +80,6 @@ class TextInputScrollView(ScrollView):
             
             # The TextInput itself
             text_input = TextInput(
-                text=f"Default text for input {i}",
                 size_hint_x=1,
                 multiline=False,
                 font_size=dp(14),
