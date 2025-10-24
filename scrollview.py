@@ -1003,17 +1003,19 @@ class ScrollView(StencilView):
         
         # In nested configuration, outer ScrollView maintains grab ownership
         # Only ungrab outer if we're currently grabbed by it
-        if 'nested' in touch.ud and touch.grab_current == touch.ud['nested']['outer']:
-            touch.ungrab(touch.ud['nested']['outer'])
+        if 'nested' in touch.ud and 'hierarchy' in touch.ud['nested']:
+            outer = touch.ud['nested']['hierarchy'].outer
+            if touch.grab_current == outer:
+                touch.ungrab(outer)
             
         ret = super(ScrollView, self).on_touch_down(touch)
         
         # If we ungrabbed the outer and no child grabbed the touch, restore the grab
         # This ensures the outer can still handle touch_up properly
-        if ('nested' in touch.ud and 
-            original_grab_current == touch.ud['nested']['outer'] and 
-            touch.grab_current is None):
-            touch.grab(touch.ud['nested']['outer'])
+        if 'nested' in touch.ud and 'hierarchy' in touch.ud['nested']:
+            outer = touch.ud['nested']['hierarchy'].outer
+            if original_grab_current == outer and touch.grab_current is None:
+                touch.grab(outer)
             
         touch.pop()
         return ret
@@ -1357,7 +1359,6 @@ class ScrollView(StencilView):
         # For MOUSE WHEEL in orthogonal setups, try outer ScrollView
         if is_wheel:
             # Try outer with ORIGINAL touch (already popped above)
-            touch.ud['nested']['mode'] = 'outer'  # Update mode for tracking
             if self._scroll_initialize(touch):
                 return True
         
@@ -1443,10 +1444,6 @@ class ScrollView(StencilView):
         Returns:
             bool: Result from parent's _scroll_update
         """
-        # Update mode for backward compatibility (2-level code)
-        if parent_sv is touch.ud['nested'].get('outer'):
-            touch.ud['nested']['mode'] = 'outer'
-        
         # Initialize parent's scroll state if not already set up
         parent_uid = parent_sv._get_uid()
         if parent_uid not in touch.ud:
@@ -1470,59 +1467,6 @@ class ScrollView(StencilView):
         # Now process the touch movement with parent
         touch.ud['sv.handled'] = {'x': False, 'y': False}
         return parent_sv._scroll_update(touch)
-    
-    def _handle_nested_inner_move(self, touch, inner):
-        # Handle touch movement when inner ScrollView is active in nested setup.
-        # 
-        # Delegates to inner with coordinate transformation. If inner rejects
-        # (orthogonal movement), switches to outer ScrollView.
-        # 
-        # Args:
-        #     touch: The touch event
-        #     inner: The inner ScrollView handling the gesture
-        # 
-        # Returns:
-        #     bool: Result from inner or outer _scroll_update
-        
-        # Check if inner's child widget claimed the touch (button press, etc.)
-        inner_claimed = inner._get_uid('claimed_by_child') in touch.ud
-        if inner_claimed:
-            # Inner's child claimed touch - don't scroll outer or inner
-            return True
-        
-        touch.ud['sv.handled'] = {'x': False, 'y': False}
-        # Transform touch to inner's parent coordinate space
-        touch.push()
-        touch.apply_transform_2d(inner.parent.to_widget)
-        result = inner._scroll_update(touch)
-        touch.pop()
-        
-        # If inner rejected (orthogonal delegation), switch to outer
-        if not result:
-            # For 2-level: delegate to outer (self)
-            return self._delegate_to_parent_scroll(touch, inner, self)
-        return result
-    
-    def _handle_nested_outer_move(self, touch, inner):
-        # Handle touch movement when outer ScrollView is active in nested setup.
-        # 
-        # Processes scroll updates on outer. Checks if inner's child claimed
-        # the touch to prevent scrolling.
-        # 
-        # Args:
-        #     touch: The touch event
-        #     inner: The inner ScrollView (for checking claimed status)
-        # 
-        # Returns:
-        #     bool: True if handled, result from _scroll_update otherwise
-        
-        # Check if inner's child widget claimed the touch
-        if inner and inner._get_uid('claimed_by_child') in touch.ud:
-            # Inner's child claimed touch - don't scroll outer either
-            return True
-        # Outer is handling - process normally
-        touch.ud['sv.handled'] = {'x': False, 'y': False}
-        return self._scroll_update(touch)
     
     def _detect_scroll_intent(self, touch, ud):
         # Detect if touch movement indicates scroll intent vs click.
@@ -1590,18 +1534,13 @@ class ScrollView(StencilView):
         
         # Only check delegation if we're the CURRENT handler in the hierarchy
         # For arbitrary depth: check current_index
-        # For 2-level: check mode (backward compatibility)
-        if 'current_index' in touch.ud['nested']:
-            # New hierarchy-based routing: only delegate if we're the current handler
-            if my_index != touch.ud['nested']['current_index']:
-                return False  # Not our turn to handle, don't delegate
-        elif 'mode' in touch.ud['nested']:
-            # Old 2-level routing: check mode for backward compatibility
-            if touch.ud['nested']['mode'] != 'inner':
-                return False
-        else:
+        # Check if we're the current handler (hierarchy-based routing)
+        if 'current_index' not in touch.ud['nested']:
             # No routing info - shouldn't happen but be safe
             return False
+        
+        if my_index != touch.ud['nested']['current_index']:
+            return False  # Not our turn to handle, don't delegate
         
         # Get our relationship with immediate parent
         classification = hierarchy.get_classification(my_index)
@@ -1630,37 +1569,6 @@ class ScrollView(StencilView):
         if uid_key in touch.ud and not touch.ud[uid_key].get('can_defocus', True):
             FocusBehavior.ignored_touch.append(touch)
     
-    def _finalize_nested_inner(self, touch, inner):
-        # Finalize inner ScrollView after touch release in nested setup.
-        # 
-        # Calls inner's finalization with proper coordinate transformation
-        # and handles focus behavior.
-        # 
-        # Args:
-        #     touch: The touch event
-        #     inner: The inner ScrollView to finalize
-        
-        inner_uid = inner._get_uid()
-        if inner_uid in touch.ud:
-            # Transform touch to inner's parent coordinate space
-            touch.push()
-            touch.apply_transform_2d(inner.parent.to_widget)
-            inner._scroll_finalize(touch)
-            touch.pop()
-            self._handle_focus_behavior(touch, inner_uid)
-    
-    def _finalize_nested_outer(self, touch):
-        # Finalize outer ScrollView after touch release in nested setup.
-        # 
-        # Calls finalization and handles focus behavior.
-        # 
-        # Args:
-        #     touch: The touch event
-        
-        self._scroll_finalize(touch)
-        uid_key = self._get_uid()
-        self._handle_focus_behavior(touch, uid_key)
-
     def _touch_in_handle(self, pos, size, touch):
         # check if the touch is in the handle of the scrollview
         # thouching the handle allows the user to drag the scrollview
@@ -2023,6 +1931,9 @@ class ScrollView(StencilView):
         
         Called during on_touch_move when delegating from child to parent.
         """
+        # Clear our active touch reference (must do this so we can accept new touches)
+        self._touch = None
+        
         # Get scroll state
         uid = self._get_uid()
         if uid not in touch.ud:
@@ -2180,21 +2091,15 @@ class ScrollView(StencilView):
             config_type = hierarchy.get_classification(hierarchy.depth - 1)
             axis_config = hierarchy.get_axis_config(hierarchy.depth - 1)
 
-            # Set up nested coordination with BOTH hierarchy and backward-compatible fields
+            # Set up nested coordination with hierarchy
             touch.ud['nested'] = {
-                # NEW: Full hierarchy for arbitrary depth
                 'hierarchy': hierarchy,
                 'current_index': hierarchy.touched_index,  # Start at innermost
-                
-                # BACKWARD COMPATIBLE: Keep 2-level fields for existing code
-                'outer': outer_sv,
-                'inner': inner_sv,
-                'mode': 'inner',  # Start with inner handling touch
                 'config_type': config_type,  # Classification of inner with its parent
                 'delegation_mode': DelegationMode.UNLOCKED  # Will be set in _scroll_initialize
             }
 
-            # Store axis_config for mixed configurations (backward compatible)
+            # Store axis_config for mixed configurations
             if axis_config:
                 touch.ud['nested']['axis_config'] = axis_config
 
@@ -2240,8 +2145,8 @@ class ScrollView(StencilView):
         # This is the first phase of the scroll gesture, call from on_touch_down
         # it is used to determine if the scrollview should handle the touch
         # and to initialize the scroll effects
-        if 'nested' in touch.ud:
-            is_inner = (touch.ud['nested']['inner'] == self)
+        if 'nested' in touch.ud and 'hierarchy' in touch.ud['nested']:
+            is_inner = (touch.ud['nested']['hierarchy'].inner == self)
         
         # Check if this touch was claimed by a child widget (e.g., button)
         # If so, don't initialize scrolling
@@ -2250,7 +2155,8 @@ class ScrollView(StencilView):
         
         # Skip collision check if we're the inner in a nested setup and parent already validated
         # (parent called us directly after finding us with _find_child_scrollview_at_touch)
-        skip_collision = ('nested' in touch.ud and touch.ud['nested']['inner'] == self)
+        skip_collision = ('nested' in touch.ud and 'hierarchy' in touch.ud['nested'] 
+                         and touch.ud['nested']['hierarchy'].inner == self)
         
         if not skip_collision and not self.collide_point(*touch.pos):
             touch.ud[self._get_uid('svavoid')] = True
@@ -2419,19 +2325,11 @@ class ScrollView(StencilView):
                             child_sv._finalize_scroll_for_cascade(touch)
                             touch.pop()
                             
-                            # Update mode for backward compatibility (2-level code)
-                            if parent_sv is hierarchy.outer:
-                                touch.ud['nested']['mode'] = 'outer'
-                            
                             # Parent just initialized - return True and let next touch_move handle it
                             # This prevents immediate cascading in the same event
                             return True
                         
                         # Parent already initialized - try it now (continue loop)
-                        # Update mode for backward compatibility (2-level code)
-                        if parent_sv is hierarchy.outer:
-                            touch.ud['nested']['mode'] = 'outer'
-                        
                         # Continue loop to try parent
                         continue
                     else:
