@@ -22,6 +22,19 @@ from kivy.metrics import dp
 from scrollview import ScrollView
 
 
+class DebugButton(Button):
+    def on_touch_down(self, touch):
+        result = super().on_touch_down(touch)
+        if result:
+            print(f"[BUTTON] {self.text} grabbed touch {id(touch) % 10000}")
+        return result
+    
+    def on_touch_up(self, touch):
+        print(f"[BUTTON] {self.text} on_touch_up called, grab_current={touch.grab_current}")
+        result = super().on_touch_up(touch)
+        return result
+
+
 class MonsterNestingDemo(App):
     """Main app with XY outer ScrollView containing a grid of different nested demos."""
     
@@ -426,7 +439,7 @@ class MonsterNestingDemo(App):
             inner_content.bind(minimum_width=inner_content.setter('width'))
             
             for j in range(10):
-                btn = Button(
+                btn = DebugButton(
                     text=f'R{i+1}\n{j+1}',
                     size_hint_x=None,
                     width=dp(60),
