@@ -48,7 +48,7 @@ class MonsterNestingDemo(App):
         
         # Title
         title = Label(
-            text='Monster Nesting Demo - All Configurations (BoxLayout Grid)',
+            text='Monster Nesting Demo - 12 Configurations',
             size_hint=(None, None),
             width=dp(1400),
             height=dp(50),
@@ -61,10 +61,23 @@ class MonsterNestingDemo(App):
         title.bind(size=title.setter('text_size'))
         main_container.add_widget(title)
         
-        # Outer vertical BoxLayout containing 3 rows
+        # Outer vertical BoxLayout containing 4 rows
         # Each row is a horizontal BoxLayout containing 3 panels
         
-        # Row 1
+        # Row 0 - Basic single ScrollViews (for comparison)
+        row0 = BoxLayout(
+            orientation='horizontal',
+            spacing=dp(20),
+            size_hint=(None, None),
+            height=dp(450)
+        )
+        row0.bind(minimum_width=row0.setter('width'))
+        row0.add_widget(self._create_single_vertical())
+        row0.add_widget(self._create_single_horizontal())
+        row0.add_widget(self._create_single_xy())
+        main_container.add_widget(row0)
+        
+        # Row 1 - Parallel nesting
         row1 = BoxLayout(
             orientation='horizontal',
             spacing=dp(20),
@@ -132,6 +145,121 @@ class MonsterNestingDemo(App):
         container.add_widget(title)
         
         return container
+    
+    def _create_single_vertical(self):
+        """Single Vertical ScrollView (V)"""
+        panel = self._create_panel_container('Single Vertical\n(V)', [0.5, 0.5, 1.0, 1])
+        
+        # Single vertical ScrollView
+        sv = ScrollView(
+            do_scroll_x=False,
+            do_scroll_y=True,
+            scroll_type=['bars', 'content'],
+            size_hint=(None, None),
+            size=(dp(400), dp(390)),
+            bar_width=dp(8),
+            bar_color=[0.5, 0.5, 1.0, 0.8],
+            smooth_scroll_end=10
+        )
+        
+        content = GridLayout(
+            cols=1,
+            spacing=dp(5),
+            size_hint_y=None,
+            padding=dp(5)
+        )
+        content.bind(minimum_height=content.setter('height'))
+        
+        # Add buttons
+        for i in range(20):
+            btn = Button(
+                text=f'V-{i+1}',
+                size_hint_y=None,
+                height=dp(45),
+                background_color=[0.3, 0.3, 0.9, 1]
+            )
+            content.add_widget(btn)
+        
+        sv.add_widget(content)
+        panel.add_widget(sv)
+        return panel
+    
+    def _create_single_horizontal(self):
+        """Single Horizontal ScrollView (H)"""
+        panel = self._create_panel_container('Single Horizontal\n(H)', [1.0, 0.5, 0.5, 1])
+        
+        # Single horizontal ScrollView
+        sv = ScrollView(
+            do_scroll_x=True,
+            do_scroll_y=False,
+            scroll_type=['bars', 'content'],
+            size_hint=(None, None),
+            size=(dp(400), dp(390)),
+            bar_width=dp(8),
+            bar_color=[1.0, 0.5, 0.5, 0.8],
+            smooth_scroll_end=10
+        )
+        
+        content = BoxLayout(
+            orientation='horizontal',
+            spacing=dp(5),
+            size_hint_x=None,
+            padding=dp(5)
+        )
+        content.bind(minimum_width=content.setter('width'))
+        
+        # Add buttons
+        for i in range(15):
+            btn = Button(
+                text=f'H\n{i+1}',
+                size_hint_x=None,
+                width=dp(70),
+                background_color=[0.9, 0.3, 0.3, 1]
+            )
+            content.add_widget(btn)
+        
+        sv.add_widget(content)
+        panel.add_widget(sv)
+        return panel
+    
+    def _create_single_xy(self):
+        """Single XY ScrollView (XY)"""
+        panel = self._create_panel_container('Single XY\n(XY)', [0.5, 1.0, 0.5, 1])
+        
+        # Single XY ScrollView
+        sv = ScrollView(
+            do_scroll_x=True,
+            do_scroll_y=True,
+            scroll_type=['bars', 'content'],
+            size_hint=(None, None),
+            size=(dp(400), dp(390)),
+            bar_width=dp(8),
+            bar_color=[0.5, 1.0, 0.5, 0.8],
+            smooth_scroll_end=10
+        )
+        
+        content = GridLayout(
+            cols=9,  # 9 columns for wider scrolling
+            spacing=dp(5),
+            size_hint=(None, None),
+            padding=dp(5)
+        )
+        content.bind(minimum_width=content.setter('width'))
+        content.bind(minimum_height=content.setter('height'))
+        
+        # Add buttons
+        for i in range(99):  # 11 rows x 9 cols
+            btn = Button(
+                text=f'XY\n{i+1}',
+                size_hint=(None, None),
+                size=(dp(70), dp(50)),
+                background_color=[0.3, 0.9, 0.3, 1]
+            )
+            content.add_widget(btn)
+        
+        sv.add_widget(content)
+        panel.add_widget(sv)
+        return panel
     
     def _create_parallel_vertical(self):
         """Parallel Vertical: V->V (both scroll vertically)"""
@@ -337,8 +465,8 @@ class MonsterNestingDemo(App):
         )
         outer_content.bind(minimum_width=outer_content.setter('width'))
         
-        # Add 4 inner vertical ScrollViews (more than fits)
-        for i in range(4):
+        # Add 5 inner vertical ScrollViews (more than fits)
+        for i in range(5):
             inner_sv = ScrollView(
                 do_scroll_x=False,
                 do_scroll_y=True,
@@ -411,7 +539,7 @@ class MonsterNestingDemo(App):
             )
             
             inner_content = GridLayout(
-                cols=3,
+                cols=5,  # 5 columns to force horizontal scrolling
                 spacing=dp(5),
                 size_hint=(None, None),
                 padding=dp(5)
@@ -419,11 +547,11 @@ class MonsterNestingDemo(App):
             inner_content.bind(minimum_width=inner_content.setter('width'))
             inner_content.bind(minimum_height=inner_content.setter('height'))
             
-            for j in range(18):  # 6 rows x 3 cols
+            for j in range(30):  # 6 rows x 5 cols = 30 buttons
                 btn = Button(
                     text=f'XY{i+1}\n{j+1}',
                     size_hint=(None, None),
-                    size=(dp(50), dp(40)),
+                    size=(dp(60), dp(50)),  # Slightly larger buttons
                     background_color=[0.3 + (i%3)*0.2, 0.4, 0.8 - (i//3)*0.1, 1]
                 )
                 inner_content.add_widget(btn)
@@ -502,7 +630,7 @@ class MonsterNestingDemo(App):
         Full 3-level XY->XY->V configuration.
         GridLayout was the issue, not StencilView depth!
         """
-        panel = self._create_panel_container('Mixed XY->XY->V', [0.3, 1.0, 1.0, 1])
+        panel = self._create_panel_container('Mixed XY->V', [0.3, 1.0, 1.0, 1])
         
         # Outer XY ScrollView
         outer_sv = ScrollView(
@@ -518,7 +646,7 @@ class MonsterNestingDemo(App):
         
         # Middle XY ScrollView content
         middle_content = GridLayout(
-            cols=3,
+            cols=5,  # 5 columns for wider content
             spacing=dp(10),
             size_hint=(None, None),
             padding=dp(5)
@@ -526,8 +654,8 @@ class MonsterNestingDemo(App):
         middle_content.bind(minimum_width=middle_content.setter('width'))
         middle_content.bind(minimum_height=middle_content.setter('height'))
         
-        # Add 9 inner vertical ScrollViews (3 rows x 3 cols for more height)
-        for i in range(9):
+        # Add 15 inner vertical ScrollViews (3 rows x 5 cols for more width)
+        for i in range(15):
             inner_sv = ScrollView(
                 do_scroll_x=False,
                 do_scroll_y=True,
@@ -638,8 +766,8 @@ class MonsterNestingDemo(App):
         inner_sv.add_widget(inner_content)
         middle_content.add_widget(inner_sv)
         
-        # Add some buttons to middle level
-        for i in range(3):
+        # Add buttons to middle level
+        for i in range(10):
             btn = Button(
                 text=f'L2-{i+1}',
                 size_hint_y=None,
@@ -741,7 +869,7 @@ class MonsterNestingDemo(App):
         middle_content.add_widget(inner_sv)
         
         # Add some buttons to middle level
-        for i in range(3):
+        for i in range(8):
             btn = Button(
                 text=f'L2-{i+1}',
                 size_hint_x=None,
