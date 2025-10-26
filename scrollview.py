@@ -302,43 +302,38 @@ class DelegationMode(str, Enum):
 # =============================================================================
 
 class ScrollViewHierarchy:
-    """Manages the hierarchy of nested ScrollViews for a touch gesture.
-    
-    Stores ScrollViews from outermost (index 0) to innermost (index n).
-    Each ScrollView can use its index to find its parent and navigate the chain.
-    
-    Design Philosophy:
-    - ScrollViews are stored in a list (scrollviews[0] = outer, scrollviews[-1] = inner)
-    - Relationship data (classification, axis_config) stored separately
-    - Classifications describe relationships BETWEEN levels, not properties OF levels
-    - Index arithmetic is encapsulated in methods for safety
-    
-    Example for 3-level hierarchy (outer → middle → inner):
-        scrollviews = [outer, middle, inner]
-        _parent_child_data = [
-            {classification: 'parallel', axis_config: None},  # outer→middle relationship
-            {classification: 'orthogonal', axis_config: None} # middle→inner relationship
-        ]
-    """
+    # INTERNAL CLASS - Manages the hierarchy of nested ScrollViews for a touch gesture.
+    # 
+    # Stores ScrollViews from outermost (index 0) to innermost (index n).
+    # Each ScrollView can use its index to find its parent and navigate the chain.
+    # 
+    # Design Philosophy:
+    # - ScrollViews are stored in a list (scrollviews[0] = outer, scrollviews[-1] = inner)
+    # - Relationship data (classification, axis_config) stored separately
+    # - Classifications describe relationships BETWEEN levels, not properties OF levels
+    # - Index arithmetic is encapsulated in methods for safety
+    # 
+    # Example for 3-level hierarchy (outer → middle → inner):
+    #     scrollviews = [outer, middle, inner]
+    #     _parent_child_data = [
+    #         {classification: 'parallel', axis_config: None},  # outer→middle relationship
+    #         {classification: 'orthogonal', axis_config: None} # middle→inner relationship
+    #     ]
     
     def __init__(self, outer_sv):
-        """Initialize hierarchy with the outermost ScrollView.
-        
-        Args:
-            outer_sv: The outermost ScrollView in the hierarchy
-        """
+        # Initialize hierarchy with the outermost ScrollView.
+        # Args:
+        #   outer_sv: The outermost ScrollView in the hierarchy
         self.scrollviews = [outer_sv]  # List from outer to inner
         self._parent_child_data = []   # Relationship data between adjacent levels
         self.touched_index = 0         # Index of ScrollView where touch started
     
     def add_child(self, child_sv, classification, axis_config=None):
-        """Add a child ScrollView to the hierarchy.
-        
-        Args:
-            child_sv: The child ScrollView to add
-            classification: 'orthogonal', 'parallel', or 'mixed'
-            axis_config: Dict with axis configuration (only for mixed)
-        """
+        # Add a child ScrollView to the hierarchy.
+        # Args:
+        #   child_sv: The child ScrollView to add
+        #   classification: 'orthogonal', 'parallel', or 'mixed'
+        #   axis_config: Dict with axis configuration (only for mixed)
         self.scrollviews.append(child_sv)
         self._parent_child_data.append({
             'classification': classification,
@@ -347,71 +342,58 @@ class ScrollViewHierarchy:
         self.touched_index = len(self.scrollviews) - 1
     
     def get_parent(self, current_index):
-        """Get parent ScrollView for given index.
-        
-        Args:
-            current_index: Index of the child ScrollView
-            
-        Returns:
-            Parent ScrollView, or None if at root (index 0)
-        """
+        # Get parent ScrollView for given index.
+        # Args:
+        #   current_index: Index of the child ScrollView
+        # Returns:
+        #   Parent ScrollView, or None if at root (index 0)
         if current_index > 0:
             return self.scrollviews[current_index - 1]
         return None
     
     def get_relationship(self, child_index):
-        """Get relationship data between child at child_index and its parent.
-        
-        Encapsulates the index arithmetic for accessing relationship data.
-        
-        Args:
-            child_index: Index of the child ScrollView
-            
-        Returns:
-            Dict with 'classification' and 'axis_config', or None if no parent
-        """
+        # Get relationship data between child at child_index and its parent.
+        # Encapsulates the index arithmetic for accessing relationship data.
+        # Args:
+        #   child_index: Index of the child ScrollView
+        # Returns:
+        #   Dict with 'classification' and 'axis_config', or None if no parent
         if 0 < child_index < len(self.scrollviews):
             return self._parent_child_data[child_index - 1]
         return None
     
     def get_classification(self, child_index):
-        """Get classification between child and its parent.
-        
-        Args:
-            child_index: Index of the child ScrollView
-            
-        Returns:
-            Classification string ('orthogonal', 'parallel', 'mixed'),
-            or None if child_index is 0 (no parent)
-        """
+        # Get classification between child and its parent.
+        # Args:
+        #   child_index: Index of the child ScrollView
+        # Returns:
+        #   Classification string ('orthogonal', 'parallel', 'mixed'),
+        #   or None if child_index is 0 (no parent)
         rel = self.get_relationship(child_index)
         return rel['classification'] if rel else None
     
     def get_axis_config(self, child_index):
-        """Get axis configuration for mixed classification.
-        
-        Args:
-            child_index: Index of the child ScrollView
-            
-        Returns:
-            Axis config dict for mixed cases, or None
-        """
+        # Get axis configuration for mixed classification.
+        # Args:
+        #   child_index: Index of the child ScrollView
+        # Returns:
+        #   Axis config dict for mixed cases, or None
         rel = self.get_relationship(child_index)
         return rel['axis_config'] if rel else None
     
     @property
     def depth(self):
-        """Total depth of hierarchy (number of levels)."""
+        # Total depth of hierarchy (number of levels).
         return len(self.scrollviews)
     
     @property
     def outer(self):
-        """Outermost ScrollView (index 0)."""
+        # Outermost ScrollView (index 0).
         return self.scrollviews[0]
     
     @property
     def inner(self):
-        """Innermost ScrollView (last in list)."""
+        # Innermost ScrollView (last in list).
         return self.scrollviews[-1]
 
 
