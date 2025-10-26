@@ -1024,8 +1024,6 @@ class ScrollView(StencilView):
         touch.apply_transform_2d(self.to_local)
         
         # Dispatch touch to children
-        # NOTE: In nested configs, _change_touch_mode already ungrabbed all ScrollViews
-        # before calling this method, so we don't need to ungrab/regrab here
         ret = super(ScrollView, self).on_touch_down(touch)
         
         touch.pop()
@@ -2654,6 +2652,12 @@ class ScrollView(StencilView):
         # Handles touch release for both standalone and nested configurations.
         # For nested setups (2+ levels), uses current_index to finalize the
         # correct ScrollView in the chain.
+        
+        # CRITICAL: Unschedule the timeout callback to prevent race condition
+        # If the timeout fires during on_touch_up processing, child widgets can
+        # grab the touch too late and never receive on_touch_up (stuck button bug)
+        if self._touch is touch:
+            Clock.unschedule(self._change_touch_mode)
         
         # DEBUG: Track on_touch_up entry
         if self.collide_point(*touch.pos):
