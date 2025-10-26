@@ -1570,7 +1570,6 @@ class ScrollView(StencilView):
         
         # Check if delegation to outer is enabled
         if not self.delegate_to_outer:
-            print(f"[DELEGATE] {self._get_debug_name()} blocking delegation (delegate_to_outer=False)")
             return False  # Delegation disabled - don't cascade to parent
         
         if not hierarchy or parent_sv is None:
@@ -2045,7 +2044,6 @@ class ScrollView(StencilView):
             # Still at boundary - check if trying to scroll beyond
             if scrolling_beyond:
                 # Trying to overscroll - DELEGATE to parent (chain delegation)
-                print(f"[DELEGATE] {self._get_debug_name()} parallel X boundary - trying to delegate")
                 return True  # Delegate to parent
                 
         elif primary_axis == 'y' and self.do_scroll_y:  # Vertical scrolling
@@ -2064,7 +2062,6 @@ class ScrollView(StencilView):
             # Still at boundary - check if trying to scroll beyond
             if scrolling_beyond:
                 # Trying to overscroll - DELEGATE to parent (chain delegation)
-                print(f"[DELEGATE] {self._get_debug_name()} parallel Y boundary - trying to delegate")
                 return True  # Delegate to parent
         
         return False
@@ -2133,7 +2130,6 @@ class ScrollView(StencilView):
         
         # Safeguard: Check if already finalized
         if ud.get('_finalized_for_cascade'):
-            print(f"  -> WARNING: Already finalized for cascade! Skipping.")
             return
         ud['_finalized_for_cascade'] = True
         
@@ -2659,26 +2655,11 @@ class ScrollView(StencilView):
         if self._touch is touch:
             Clock.unschedule(self._change_touch_mode)
         
-        # DEBUG: Track on_touch_up entry
-        if self.collide_point(*touch.pos):
-            axes = []
-            if self.do_scroll_x:
-                axes.append('X')
-            if self.do_scroll_y:
-                axes.append('Y')
-            axis_str = '+'.join(axes) if axes else 'NONE'
-            grab_widgets = [w() for w in (touch.grab_list or [])]
-            grab_state = getattr(touch, 'grab_state', False)
-            has_nested = 'nested' in touch.ud
-            has_claimed = touch.ud.get('sv.claimed_by_child', False)
-            print(f"[UP] SV[{axis_str}:{id(self)%10000}] t={id(touch)%10000}, grab_list={len(grab_widgets)}, grab_state={grab_state}, nested={has_nested}, claimed={has_claimed}")
-        
-        # FAST PATH: If ANY nested hierarchy already handled this touch, be transparent
-        # This lets the touch propagate naturally to grabbed widgets (buttons)
-        # Check if the flag exists (set by any hierarchy's outer ScrollView)
+        # FAST PATH: If ANY nested hierarchy already completed on_touch_up, skip processing
+        # This prevents duplicate processing when non-adjacent delegation creates
+        # multiple hierarchies for the same touch (e.g., 3-level cascade becomes 2-level)
+        # The first hierarchy to complete sets this flag, all others become transparent
         if 'sv_hierarchy_handled' in touch.ud:
-            # Return False to let touch propagate to children/grabbed widgets
-            # Kivy's grab mechanism will deliver on_touch_up to buttons
             return False
         
         # NESTED COORDINATION: Check if we have hierarchy data
@@ -2687,24 +2668,10 @@ class ScrollView(StencilView):
             hierarchy = nested_data['hierarchy']
             current_index = nested_data['current_index']
             
-            # If another hierarchy already handled this touch, skip processing
-            # This happens when Phase 8 cascade creates a shallower hierarchy that finishes first
-            if 'sv_hierarchy_handled' in touch.ud:
-                return False
-            
-            # Re-entry guard: Check if this ScrollView already processed this touch_up
-            processed_key = f'_touch_up_processed_{id(self)}'
-            if processed_key in touch.ud:
-                print(f"  -> WARNING: Already processed on_touch_up for this ScrollView! Preventing recursion.")
-                return False  # Let it propagate without claiming
-            touch.ud[processed_key] = True
-            
             # Only the OUTER ScrollView coordinates
             if hierarchy.outer is not self:
-                # Intermediate ScrollView - check if button claimed, then return False
+                # Intermediate ScrollView - be transparent
                 # Outer ScrollView will do the cleanup
-                claimed_by_child = touch.ud.get('sv.claimed_by_child', False)
-                print(f"  -> {self._get_debug_name()} intermediate SV (outer={hierarchy.outer._get_debug_name()}), claimed={claimed_by_child}, returning False, t={id(touch)%10000}")
                 return False
             
             # Get the ScrollView that was handling this touch
@@ -2753,18 +2720,10 @@ class ScrollView(StencilView):
             # This ensures intermediate parent widgets receive on_touch_up events
             # Kivy's grab mechanism will also dispatch to grabbed widgets automatically
             if claimed_by_child:
-                # DEBUG: Show what's in grab_list
-                grab_widgets = [w() for w in (touch.grab_list or [])]
-                non_sv_grabbed = [w for w in grab_widgets if w and not isinstance(w, ScrollView)]
-                print(f"  -> claimed_by_child=True, cleaned up hierarchy, calling super(), grab_list={non_sv_grabbed}")
                 return super(ScrollView, self).on_touch_up(touch)
             
             # No child claimed - ScrollView handled the gesture
             # Return False to allow other widgets to process if needed
-            grab_widgets = [w() for w in (touch.grab_list or [])]
-            non_sv_grabbed = [w for w in grab_widgets if w and not isinstance(w, ScrollView)]
-            print(f"  -> Returning False, grab_list has {len(non_sv_grabbed)} non-SV widgets: {non_sv_grabbed}")
-            
             return False
         
         # STANDALONE: Handle touch release
