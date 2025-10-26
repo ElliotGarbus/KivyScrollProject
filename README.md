@@ -1,6 +1,4 @@
-Updated implementation for ScrollView with nesting support.
-
-This is a WIP I want to enable ScrollView to support arbitrary levels of nesting.
+Updated implementation for ScrollView with full nesting support.  Supports nesting to arbitrary levels.
 
 The on_scroll_events (on_scroll_start, on_scroll_move, and on_stroll_stop) have been updated.
 They now work as expected, firing when the movement starts, continues and stops.
@@ -41,6 +39,25 @@ parallel_delegation = BooleanProperty(True)
     
     Default: True (web-style)
 
+delegate_to_outer = BooleanProperty(True)
+
+    Controls whether scroll gestures delegate to outer ScrollViews.
+    
+    When True (default):
+        - Orthogonal: Cross-axis gestures immediately delegate to outer
+          (e.g., horizontal swipe in vertical-only ScrollView)
+        - Parallel: At boundaries, delegates to outer (respects parallel_delegation)
+        - Arbitrary depth: Continues searching up hierarchy for capable ScrollView
+    
+    When False:
+        - No delegation to outer ScrollViews
+        - Only the directly touched ScrollView handles the gesture
+    
+    Example use cases:
+        - Set False to lock scrolling to a specific nested level
+        - Set False to prevent inner scroll from affecting outer scroll
+    
+    
 
 
 
@@ -49,13 +66,15 @@ Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollVi
 to the inner and outer ScrollView. Things worked nicely, but I have decided to integrate the capabilities back into
 ScrollView, rather than have two separate widgets.
 
-Directory V1 Two Level Nesting - this version of ScrollView supports two levels of nesting, outer and inner.
+Directory V1 Two Level Nesting - this version of ScrollView supports two levels of nesting, outer and inner. Obsolte. 
 
 In the main directory I am working to support arbitary levels of nesting scrollview.
 
  - scrollview.py - ScrollView with Nesting support
 
 Demonstrations/tests using the updated ScrollView: 
+- demo_monster_nesting.py - 12 nesting configurations in an xy scroll view.
+- demo_delegation_monster.py - 12 nesting configurations in an xy scroll view, with outer delegation control.
 - demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) 
 - demo_nested_horizontal.py - Horizontal parallel ScrollViews 
 - demo_nested_vertical.py - Multiple vertical parallel ScrollViews
