@@ -2327,10 +2327,10 @@ class ScrollView(StencilView):
                     self._check_velocity_for_stop, 1/60.0)
                 return True
             return False
-        
+
         if scroll_type == ['bars'] and not in_bar:
             return self._simulate_touch_down(touch)
-        
+
         if in_bar:
             self._handle_scrollbar_jump(touch, in_bar_x, in_bar_y)
             # Dispatch on_scroll_start for scrollbar interactions
