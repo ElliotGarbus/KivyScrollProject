@@ -23,15 +23,33 @@ from scrollview import ScrollView
 
 
 class DebugButton(Button):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._grabbed_touches = set()
+    
     def on_touch_down(self, touch):
         result = super().on_touch_down(touch)
         if result:
-            print(f"[BUTTON] {self.text} grabbed touch {id(touch) % 10000}")
+            touch_id = id(touch) % 10000
+            self._grabbed_touches.add(touch_id)
+            print(f"[BTN-DOWN] {self.text} grabbed touch {touch_id}, total_grabbed={len(self._grabbed_touches)}")
         return result
     
     def on_touch_up(self, touch):
-        print(f"[BUTTON] {self.text} on_touch_up called, grab_current={touch.grab_current}")
+        touch_id = id(touch) % 10000
+        was_grabbed = touch_id in self._grabbed_touches
+        
+        # Debug: Show grab state
+        if was_grabbed or len(self._grabbed_touches) > 0:
+            print(f"[BTN-UP-PRE] {self.text} t={touch_id}, was_grabbed={was_grabbed}, grabbed_set={self._grabbed_touches}, grab_current={touch.grab_current}")
+        
         result = super().on_touch_up(touch)
+        
+        if was_grabbed:
+            self._grabbed_touches.discard(touch_id)
+            print(f"[BTN-UP] {self.text} released touch {touch_id}, remaining={len(self._grabbed_touches)}")
+        if len(self._grabbed_touches) > 0 and not was_grabbed:
+            print(f"[BTN-WARN] {self.text} got on_touch_up for {touch_id} but has STUCK touches: {self._grabbed_touches}")
         return result
 
 
@@ -623,7 +641,7 @@ class DelegationMonsterDemo(App):
             inner_content.bind(minimum_height=inner_content.setter('height'))
             
             for j in range(30):
-                btn = Button(
+                btn = DebugButton(
                     text=f'XY{i+1}\n{j+1}',
                     size_hint=(None, None),
                     size=(dp(60), dp(50)),
