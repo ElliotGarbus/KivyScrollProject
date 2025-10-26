@@ -834,9 +834,6 @@ class ScrollView(StencilView):
             value.bind(size=self._set_viewport_size)
             self.viewport_size = value.size
 
-    __events__ = ('on_scroll_start', 'on_scroll_move', 'on_scroll_stop')
-
-
     def __init__(self, **kwargs):
         self._touch = None
         self._nested_sv_active_touch = None  # Stores the touch that's currently active in nested scenario
