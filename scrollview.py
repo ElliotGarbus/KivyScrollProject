@@ -1068,12 +1068,18 @@ class ScrollView(StencilView):
     def _find_child_scrollview_at_touch(self, touch):
         # Find the child ScrollView that collides with the touch position.
         # 
+        # Strategy: When we encounter a Layout,
+        # we first identify which specific child collides with the touch,
+        # then only explore that child's subtree. This naturally handles
+        # arbitrary depth and prevents finding ScrollViews from unrelated
+        # sibling branches.
+        # 
         # Returns:
         #     ScrollView: The first child ScrollView that collides with touch, or None
         
         viewport = self._viewport
         
-        # Safety checks: viewport must exist and be a Layout with children
+        # Safety checks: viewport must exist and have children
         if not viewport:
             return None
         if not hasattr(viewport, 'children'):
@@ -1085,48 +1091,43 @@ class ScrollView(StencilView):
         touch.push()
         touch.apply_transform_2d(viewport.to_widget)
 
-        # Iterate direct children first (collision check before subtree walk)
-        for child in viewport.children:
-            # Quick collision check - skip entire branch if touch isn't in it
-            if not child.collide_point(*touch.pos):
-                continue
-
-            # Is this child itself a ScrollView?
-            if isinstance(child, ScrollView):
-                touch.pop()
-                return child
-
-            # STRATEGY: If child has children, recursively narrow down first
-            # This prevents finding ScrollViews from sibling panels in the same container
-            if hasattr(child, 'children') and child.children:
-                # Recursively call on this child to narrow down further
-                result = child._find_child_scrollview_at_touch(touch) if isinstance(child, ScrollView) else None
-                
-                # If not a ScrollView, manually recurse into its children
-                if not result:
-                    for grandchild in child.children:
-                        if grandchild.collide_point(*touch.pos):
-                            # Check if grandchild is a ScrollView
-                            if isinstance(grandchild, ScrollView):
-                                touch.pop()
-                                return grandchild
-                            # Recursively search grandchild's subtree
-                            for widget in grandchild.walk(restrict=True):
-                                if isinstance(widget, ScrollView) and widget.collide_point(*touch.pos):
-                                    touch.pop()
-                                    return widget
-                            break  # Only process the first colliding grandchild
-                
-                if result:
-                    touch.pop()
-                    return result
-
-            # Fallback: Walk this child's subtree
-            for widget in child.walk(restrict=True):
-                if isinstance(widget, ScrollView) and widget.collide_point(*touch.pos):
-                    touch.pop()
-                    return widget
+        result = self._find_scrollview_in_widget(viewport, touch)
+        
         touch.pop()
+        return result
+    
+    def _find_scrollview_in_widget(self, widget, touch):
+        """Recursively find ScrollView under touch, narrowing by Layout children.
+        
+        When we encounter a widget with children (a Layout), we first
+        identify which specific child collides with the touch point, then
+        only explore that child's subtree. This prevents finding ScrollViews
+        from unrelated sibling branches.
+        
+        Args:
+            widget: The widget to search within
+            touch: The touch event (already transformed to appropriate space)
+            
+        Returns:
+            ScrollView or None: The first ScrollView found under touch
+        """
+        # If this widget has children, narrow down which child contains the touch
+        if hasattr(widget, 'children') and widget.children:
+            for child in widget.children:
+                # Skip children that don't collide with touch
+                if not child.collide_point(*touch.pos):
+                    continue
+                
+                # Found a colliding child - is it a ScrollView?
+                if isinstance(child, ScrollView):
+                    return child
+                
+                # Not a ScrollView, but it collides - recursively search its subtree
+                result = self._find_scrollview_in_widget(child, touch)
+                if result:
+                    return result
+        
+        # No children or no colliding children with ScrollViews
         return None
     
     def _build_hierarchy_recursive(self, touch):
