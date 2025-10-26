@@ -73,7 +73,6 @@ In the main directory I am working to support arbitary levels of nesting scrollv
  - scrollview.py - ScrollView with Nesting support
 
 Demonstrations/tests using the updated ScrollView: 
-- demo_monster_nesting.py - 12 nesting configurations in an xy scroll view.
 - demo_delegation_monster.py - 12 nesting configurations in an xy scroll view, with outer delegation control.
 - demo_nested_orthogonal.py - Nested orthogonal ScrollViews (vertical outer, horizontal inner) 
 - demo_nested_horizontal.py - Horizontal parallel ScrollViews 
