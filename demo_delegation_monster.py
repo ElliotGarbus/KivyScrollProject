@@ -19,7 +19,19 @@ from kivy.uix.button import Button
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.label import Label
 from kivy.metrics import dp
+from kivy.effects.dampedscroll import DampedScrollEffect
 from scrollview import ScrollView
+
+
+class ImprovedDampedScrollEffect(DampedScrollEffect):
+    """DampedScrollEffect with increased min_overscroll to prevent oscillation.
+    
+    Increases min_overscroll from 0.5 to 1.5 to prevent infinite bar highlighting
+    caused by oscillation around the threshold on touchscreens.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.min_overscroll = 1.5
 
 
 class DelegationMonsterDemo(App):
@@ -31,6 +43,8 @@ class DelegationMonsterDemo(App):
         self.panel_scrollviews = []
     
     def build(self):
+        # Set improved effect class for all ScrollViews in this demo
+        ScrollView.effect_cls = ImprovedDampedScrollEffect
         # Root container
         root = BoxLayout(orientation='vertical')
         
