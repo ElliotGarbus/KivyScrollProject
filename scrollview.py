@@ -2079,6 +2079,11 @@ class ScrollView(StencilView):
                 self._update_effect_bounds)
         ev()
         
+        # CRITICAL: Trigger bar fade animation since _scroll_finalize won't be called
+        # (our uid was deleted above, so _scroll_finalize will early-return)
+        # This schedules the 0.5s timer to fade bar from active to inactive color
+        self._trigger_update_from_scroll()
+        
         # NOTE: We do NOT handle click passthrough here because the actual
         # on_touch_up will come later and needs to reach child widgets
 
