@@ -2051,6 +2051,16 @@ class ScrollView(StencilView):
         not_in_bar = not touch.ud.get('in_bar_x', False) and not touch.ud.get('in_bar_y', False)
         self._stop_scroll_effects(touch, not_in_bar)
         
+        # CRITICAL: Completely halt effects when cascading to prevent bar staying highlighted
+        # When delegating to parent, inner must stop all updates to prevent resetting bar fade timer
+        if not_in_bar:
+            if self.effect_x:
+                self.effect_x.velocity = 0
+                self.effect_x.cancel()
+            if self.effect_y:
+                self.effect_y.velocity = 0
+                self.effect_y.cancel()
+        
         # Schedule velocity check for on_scroll_stop event
         if ud['mode'] == ScrollMode.SCROLL or ud.get('scroll_action'):
             if self._velocity_check_ev:
