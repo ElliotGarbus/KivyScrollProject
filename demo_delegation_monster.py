@@ -28,6 +28,10 @@ class ImprovedDampedScrollEffect(DampedScrollEffect):
     
     Increases min_overscroll from 0.5 to 1.5 to prevent infinite bar highlighting
     caused by oscillation around the threshold on touchscreens.
+
+    While testeing on a touchscreen laptop, I noticed that the bar 
+    would highlight infinitely when scrolling beyond the boundary.
+
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -199,8 +203,6 @@ class DelegationMonsterDemo(App):
         # Update all panel scrollviews
         for sv in self.panel_scrollviews:
             sv.delegate_to_outer = new_state
-        
-        print(f"\n[DELEGATION] delegate_to_outer set to {new_state} for {len(self.panel_scrollviews)} ScrollViews\n")
     
     def _create_panel_container(self, title_text, color):
         """Create a standardized panel container with title."""

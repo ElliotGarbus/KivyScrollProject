@@ -828,9 +828,6 @@ class ScrollView(StencilView):
     _bar_color = ListProperty([0, 0, 0, 0])
 
     def _set_viewport_size(self, instance, value):
-        # DEBUG: Track viewport size changes
-        if hasattr(self, 'viewport_size') and self.viewport_size != value:
-            print(f"[VIEWPORT_SIZE] {self._get_debug_name()} changed: {self.viewport_size} -> {value}")
         self.viewport_size = value
 
     def on__viewport(self, instance, value):
@@ -930,33 +927,21 @@ class ScrollView(StencilView):
         if not self._viewport or not self.effect_x:
             return
         scrollable_width = self.width - self.viewport_size[0]
-        old_value = self.effect_x.value
         self.effect_x.min = 0
         self.effect_x.max = min(0, scrollable_width)
         self.effect_x.value = scrollable_width * self.scroll_x
-        
-        # DEBUG: Log if bounds update changed effect value (could trigger loop)
-        if abs(old_value - self.effect_x.value) > 0.01:
-            print(f"[BOUNDS_X] {self._get_debug_name()} effect.value changed: {old_value:.2f} -> {self.effect_x.value:.2f} (scroll_x={self.scroll_x:.3f})")
 
     def _update_effect_y_bounds(self, *args):
         if not self._viewport or not self.effect_y:
             return
         scrollable_height = self.height - self.viewport_size[1]
-        old_value = self.effect_y.value
         self.effect_y.min = 0 if scrollable_height < 0 else scrollable_height
         self.effect_y.max = scrollable_height
         self.effect_y.value = self.effect_y.max * self.scroll_y
-        
-        # DEBUG: Log if bounds update changed effect value (could trigger loop)
-        if abs(old_value - self.effect_y.value) > 0.01:
-            print(f"[BOUNDS_Y] {self._get_debug_name()} effect.value changed: {old_value:.2f} -> {self.effect_y.value:.2f} (scroll_y={self.scroll_y:.3f})")
 
     def _update_effect_bounds(self, *args):
         # "sync up the physics with reality" method 
         # keeps the smooth scrolling effects aligned with the actual ScrollView state
-        # DEBUG: Track when bounds are recalculated (could create feedback loop)
-        print(f"[UPDATE_BOUNDS] {self._get_debug_name()} recalculating effect bounds")
         self._update_effect_x_bounds()
         self._update_effect_y_bounds()
 
@@ -974,17 +959,6 @@ class ScrollView(StencilView):
         if sw != 0:
             sx = self.effect_x.scroll / sw
             self.scroll_x = -sx
-        
-        # DEBUG: Show detailed effect state to understand why it keeps updating
-        effect = self.effect_x
-        at_min = abs(effect.scroll - effect.min) < 1.0
-        at_max = abs(effect.scroll - effect.max) < 1.0
-        print(f"[EFFECT_X] {self._get_debug_name()}")
-        print(f"  scroll={effect.scroll:.2f} (min={effect.min:.2f}, max={effect.max:.2f}, value={effect.value:.2f})")
-        print(f"  velocity={effect.velocity:.4f}, overscroll={effect.overscroll:.2f}")
-        print(f"  friction={effect.friction:.4f}, spring_constant={effect.spring_constant:.4f}")
-        print(f"  is_manual={effect.is_manual}, at_min={at_min}, at_max={at_max}, scroll_x={self.scroll_x:.3f}")
-        
         self._trigger_update_from_scroll()
 
     def _update_effect_y(self, *args):
@@ -1001,17 +975,6 @@ class ScrollView(StencilView):
         if sh != 0:
             sy = self.effect_y.scroll / sh
             self.scroll_y = -sy
-        
-        # DEBUG: Show detailed effect state to understand why it keeps updating
-        effect = self.effect_y
-        at_min = abs(effect.scroll - effect.min) < 1.0
-        at_max = abs(effect.scroll - effect.max) < 1.0
-        print(f"[EFFECT_Y] {self._get_debug_name()}")
-        print(f"  scroll={effect.scroll:.2f} (min={effect.min:.2f}, max={effect.max:.2f}, value={effect.value:.2f})")
-        print(f"  velocity={effect.velocity:.4f}, overscroll={effect.overscroll:.2f}")
-        print(f"  friction={effect.friction:.4f}, spring_constant={effect.spring_constant:.4f}")
-        print(f"  is_manual={effect.is_manual}, at_min={at_min}, at_max={at_max}, scroll_y={self.scroll_y:.3f}")
-        
         self._trigger_update_from_scroll()
 
     def to_local(self, x, y, **k):
@@ -2088,22 +2051,6 @@ class ScrollView(StencilView):
         not_in_bar = not touch.ud.get('in_bar_x', False) and not touch.ud.get('in_bar_y', False)
         self._stop_scroll_effects(touch, not_in_bar)
         
-        # CRITICAL: Completely halt effects when cascading to prevent bar staying highlighted
-        # When delegating to parent, inner must stop all updates to prevent resetting bar fade timer
-        if not_in_bar:
-            if self.effect_x:
-                print(f"[CASCADE] {self._get_debug_name()} halting effect_x")
-                print(f"  Before: scroll={self.effect_x.scroll:.2f}, velocity={self.effect_x.velocity:.4f}, min={self.effect_x.min:.2f}, max={self.effect_x.max:.2f}, value={self.effect_x.value:.2f}")
-                self.effect_x.velocity = 0
-                self.effect_x.cancel()
-                print(f"  After: scroll={self.effect_x.scroll:.2f}, velocity={self.effect_x.velocity:.4f}")
-            if self.effect_y:
-                print(f"[CASCADE] {self._get_debug_name()} halting effect_y")
-                print(f"  Before: scroll={self.effect_y.scroll:.2f}, velocity={self.effect_y.velocity:.4f}, min={self.effect_y.min:.2f}, max={self.effect_y.max:.2f}, value={self.effect_y.value:.2f}")
-                self.effect_y.velocity = 0
-                self.effect_y.cancel()
-                print(f"  After: scroll={self.effect_y.scroll:.2f}, velocity={self.effect_y.velocity:.4f}")
-        
         # Schedule velocity check for on_scroll_stop event
         if ud['mode'] == ScrollMode.SCROLL or ud.get('scroll_action'):
             if self._velocity_check_ev:
@@ -2135,7 +2082,6 @@ class ScrollView(StencilView):
         # CRITICAL: Trigger bar fade animation since _scroll_finalize won't be called
         # (our uid was deleted above, so _scroll_finalize will early-return)
         # This schedules the 0.5s timer to fade bar from active to inactive color
-        print(f"[CASCADE] {self._get_debug_name()} triggering bar fade at scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}")
         self._trigger_update_from_scroll()
         
         # NOTE: We do NOT handle click passthrough here because the actual
@@ -2924,18 +2870,9 @@ class ScrollView(StencilView):
         Animation.stop_all(self, '_bar_color')
         self.fbind('bar_color', self._change_bar_color)
         self._bar_color = self.bar_color
-        
-        # DEBUG: Log bar fade timer
-        vel_x = self.effect_x.velocity if self.effect_x else 0
-        vel_y = self.effect_y.velocity if self.effect_y else 0
-        overscroll_x = abs(self.effect_x.overscroll) if self.effect_x else 0
-        overscroll_y = abs(self.effect_y.overscroll) if self.effect_y else 0
-        print(f"[BAR_FADE] {self._get_debug_name()} scheduling fade timer at scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}, vel_x={vel_x:.4f}, vel_y={vel_y:.4f}, overscroll_x={overscroll_x:.2f}, overscroll_y={overscroll_y:.2f}")
-        
         ev()
 
     def _bind_inactive_bar_color(self, *args):
-        print(f"[BAR_FADE] {self._get_debug_name()} FADE TIMER FIRED - starting fade animation")
         self.funbind('bar_color', self._change_bar_color)
         self.fbind('bar_inactive_color', self._change_bar_color)
         Animation(
