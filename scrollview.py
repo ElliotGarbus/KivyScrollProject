@@ -183,6 +183,39 @@ delegation behavior:
     - New touch required at boundary to delegate to outer
 
 This behavior can be disabled by setting :attr:`parallel_delegation` to False.
+
+
+Wheel Event Delegation in Nested ScrollViews
+--------------------------------------------
+
+When using a mouse scroll wheel (or trackpad equivalent), the ScrollView applies
+*web-style* delegation:
+
+- **Wheel events are handled by only the innermost ScrollView under the
+  pointer/cursor.**
+- If that ScrollView cannot scroll further in the wheel's axis, the event is
+  *not propagated* to outer ScrollViews. This matches standard browser and OS
+  behaviors.
+- Outer ScrollViews can only respond to the wheel if the pointer is over their
+  scrollbars *or* if there are no nested ScrollViews at the pointer position.
+
+This prevents "scroll hijacking," ensuring natural, intuitive nested scroll
+experiences.
+
+**Examples:**
+- If you have a vertical ScrollView containing a horizontal ScrollView, and you
+  use the mouse wheel over the inner (horizontal) ScrollView, only the vertical
+  outer ScrollView scrolls (since the direction matches).
+- With two nested vertical ScrollViews, the wheel will only scroll the
+  innermost ScrollView under the pointer until it can scroll no further, at
+  which point further scrolling does not delegate to the parent.
+
+This behavior is always active for wheel events and cannot be changed with
+configuration.
+
+
+
+
 '''
 
 # TODO: create a test suite for the updated ScrollView for the kivy test suite.
@@ -796,7 +829,7 @@ class ScrollView(StencilView):
     '''
     
     delegate_to_outer = BooleanProperty(True)
-    '''Controls whether scroll gestures delegate to outer ScrollViews.
+    '''Controls whether touch/touchpad scroll gestures delegate to outer ScrollViews.
     
     When True (default):
         - Orthogonal: Cross-axis gestures immediately delegate to outer
@@ -808,9 +841,14 @@ class ScrollView(StencilView):
         - No delegation to outer ScrollViews
         - Only the directly touched ScrollView handles the gesture
     
+    NOTE: Mouse wheel events are NOT affected by this property. Wheel scrolling
+    always uses web-style behavior: scroll the innermost ScrollView under cursor
+    that can handle the direction. This prevents scroll hijacking when inner
+    elements reach boundaries and matches standard web browser UX.
+    
     Example use cases:
-        - Set False to lock scrolling to a specific nested level
-        - Set False to prevent inner scroll from affecting outer scroll
+        - Set False to lock touch scrolling to a specific nested level
+        - Set False to prevent inner touch scroll from affecting outer scroll
     
     :attr:`delegate_to_outer` is a :class:`~kivy.properties.BooleanProperty`
     and defaults to True.
@@ -1712,13 +1750,15 @@ class ScrollView(StencilView):
         return in_bar_x, in_bar_y
 
     def _handle_mouse_wheel_scroll(self, btn, in_bar_x, in_bar_y):
-        # Handle mouse wheel scrolling with nested routing logic.
+        # Handle mouse wheel scrolling - WEB-STYLE (no delegation).
+        # Wheel scrolls ONLY this ScrollView if it can handle the direction.
+        # If it can't, returns False to let parent widgets try.
         m = self.scroll_wheel_distance
         
-        # NESTED WHEEL ROUTING LOGIC:
-        # Critical for nested ScrollViews - prevents inner SV from consuming
-        # wheel events it can't handle, allowing outer SV to process them.
-        # When returning False, the outer ScrollView handles the delegation.
+        # WEB-STYLE BEHAVIOR:
+        # Mouse wheel scrolls the innermost ScrollView under cursor that can handle
+        # the direction. No automatic delegation through hierarchy - user must move
+        # mouse to scroll a different element. This matches standard web browser UX.
         
         if btn in self._MOUSE_WHEEL_HORIZONTAL:
             # Horizontal wheel: only handle if we can scroll horizontally
@@ -1726,22 +1766,15 @@ class ScrollView(StencilView):
                     (self.always_overscroll and self.do_scroll_x) or
                     (self._viewport and self._viewport.width > self.width)
             )):
-                # Cannot scroll horizontally - check delegate_to_outer
-                if not self.delegate_to_outer:
-                    # Isolation mode: consume event (do nothing) rather than pass through
-                    return True
-                return False  # Pass to outer ScrollView
+                return False  # Can't scroll horizontally, pass to parent
         elif btn in self._MOUSE_WHEEL_VERTICAL:
             # Vertical wheel: only handle if we can scroll vertically
             if not (self.do_scroll_y and (
                     (self.always_overscroll and self.do_scroll_y) or
                     (self._viewport and self._viewport.height > self.height)
             )):
-                # Cannot scroll vertically - check delegate_to_outer
-                if not self.delegate_to_outer:
-                    # Isolation mode: consume event (do nothing) rather than pass through
-                    return True
-                return False  # Pass to outer ScrollView
+                return False  # Can't scroll vertically, pass to parent
+        
         # Select appropriate scroll effect
         e = self._select_scroll_effect_for_wheel(btn, in_bar_x, in_bar_y)
         if not e:
@@ -2240,27 +2273,14 @@ class ScrollView(StencilView):
             if axis_config:
                 touch.ud['nested']['axis_config'] = axis_config
 
-            # For wheel events, try each level of hierarchy starting from innermost
-            # Each level decides: handle it, bubble up (delegate_to_outer=True), or consume (delegate_to_outer=False)
+            # WEB-STYLE WHEEL BEHAVIOR: Wheel scrolls ONLY innermost ScrollView under cursor
+            # No delegation through hierarchy - matches standard web browser UX
             if is_wheel:
-                # Try each ScrollView in hierarchy from innermost to outermost
-                for i in range(hierarchy.depth - 1, -1, -1):
-                    sv = hierarchy.scrollviews[i]
-                    result = sv._scroll_initialize(touch)
-                    
-                    if result:
-                        # This level handled the wheel event
-                        return True
-                    
-                    # This level couldn't handle it - check delegate_to_outer
-                    if not sv.delegate_to_outer:
-                        # Isolation mode: consume the event (don't bubble further)
-                        return True
-                    
-                    # delegate_to_outer=True: continue to next level up
-                
-                # All levels had delegate_to_outer=True and none could handle it
-                # Let event bubble to parent widgets outside this hierarchy
+                # Try only the innermost ScrollView
+                if inner_sv._scroll_initialize(touch):
+                    return True
+                # Innermost couldn't handle it - don't try outer levels
+                # This prevents scroll hijacking when inner reaches boundary
                 return False
             
             # Non-wheel touch: Initialize scrolling on the innermost child (handles coordinate transformation)
