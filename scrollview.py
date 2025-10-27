@@ -2881,16 +2881,27 @@ class ScrollView(StencilView):
 
         # New in 1.2.0, show bar when scrolling happens and (changed in 1.9.0)
         # fade to bar_inactive_color when no scroll is happening.
+        # CRITICAL: Only reschedule bar fade timer if there's significant velocity
+        # Tiny oscillations during elastic settling shouldn't keep bar highlighted forever
+        vel_x = self.effect_x.velocity if self.effect_x else 0
+        vel_y = self.effect_y.velocity if self.effect_y else 0
+        has_significant_velocity = abs(vel_x) > 1.0 or abs(vel_y) > 1.0
+        
         ev = self._bind_inactive_bar_color_ev
         if ev is None:
             ev = self._bind_inactive_bar_color_ev = Clock.create_trigger(
                 self._bind_inactive_bar_color, .5)
-        self.funbind('bar_inactive_color', self._change_bar_color)
-        Animation.stop_all(self, '_bar_color')
-        self.fbind('bar_color', self._change_bar_color)
-        self._bar_color = self.bar_color
-        print(f"[BAR_FADE] {self._get_debug_name()} scheduling fade timer at scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}")
-        ev()
+        
+        # Only reset timer if actively scrolling (not just settling oscillations)
+        if has_significant_velocity or ev.is_triggered == False:
+            self.funbind('bar_inactive_color', self._change_bar_color)
+            Animation.stop_all(self, '_bar_color')
+            self.fbind('bar_color', self._change_bar_color)
+            self._bar_color = self.bar_color
+            print(f"[BAR_FADE] {self._get_debug_name()} scheduling fade timer (vel_x={vel_x:.2f}, vel_y={vel_y:.2f})")
+            ev()
+        else:
+            print(f"[BAR_FADE] {self._get_debug_name()} SKIPPING timer reset (settling: vel_x={vel_x:.4f}, vel_y={vel_y:.4f})")
 
     def _bind_inactive_bar_color(self, *args):
         print(f"[BAR_FADE] {self._get_debug_name()} FADE TIMER FIRED - starting fade animation")
