@@ -959,7 +959,7 @@ class ScrollView(StencilView):
         if sw != 0:
             sx = self.effect_x.scroll / sw
             self.scroll_x = -sx
-        print(f"[EFFECT_X] {self._get_debug_name()} updating from effect, velocity={self.effect_x.velocity:.2f}, scroll_x={self.scroll_x:.3f}")
+        print(f"[EFFECT_X] {self._get_debug_name()} effect.scroll={self.effect_x.scroll:.2f}, velocity={self.effect_x.velocity:.4f}, overscroll={self.effect_x.overscroll:.2f}, scroll_x={self.scroll_x:.3f}")
         self._trigger_update_from_scroll()
 
     def _update_effect_y(self, *args):
@@ -976,7 +976,7 @@ class ScrollView(StencilView):
         if sh != 0:
             sy = self.effect_y.scroll / sh
             self.scroll_y = -sy
-        print(f"[EFFECT_Y] {self._get_debug_name()} updating from effect, velocity={self.effect_y.velocity:.2f}, scroll_y={self.scroll_y:.3f}")
+        print(f"[EFFECT_Y] {self._get_debug_name()} effect.scroll={self.effect_y.scroll:.2f}, velocity={self.effect_y.velocity:.4f}, overscroll={self.effect_y.overscroll:.2f}, scroll_y={self.scroll_y:.3f}")
         self._trigger_update_from_scroll()
 
     def to_local(self, x, y, **k):
@@ -2057,13 +2057,17 @@ class ScrollView(StencilView):
         # When delegating to parent, inner must stop all updates to prevent resetting bar fade timer
         if not_in_bar:
             if self.effect_x:
-                print(f"[CASCADE] {self._get_debug_name()} halting effect_x, velocity={self.effect_x.velocity:.2f}")
+                print(f"[CASCADE] {self._get_debug_name()} halting effect_x")
+                print(f"  Before: scroll={self.effect_x.scroll:.2f}, velocity={self.effect_x.velocity:.4f}, min={self.effect_x.min:.2f}, max={self.effect_x.max:.2f}, value={self.effect_x.value:.2f}")
                 self.effect_x.velocity = 0
                 self.effect_x.cancel()
+                print(f"  After: scroll={self.effect_x.scroll:.2f}, velocity={self.effect_x.velocity:.4f}")
             if self.effect_y:
-                print(f"[CASCADE] {self._get_debug_name()} halting effect_y, velocity={self.effect_y.velocity:.2f}")
+                print(f"[CASCADE] {self._get_debug_name()} halting effect_y")
+                print(f"  Before: scroll={self.effect_y.scroll:.2f}, velocity={self.effect_y.velocity:.4f}, min={self.effect_y.min:.2f}, max={self.effect_y.max:.2f}, value={self.effect_y.value:.2f}")
                 self.effect_y.velocity = 0
                 self.effect_y.cancel()
+                print(f"  After: scroll={self.effect_y.scroll:.2f}, velocity={self.effect_y.velocity:.4f}")
         
         # Schedule velocity check for on_scroll_stop event
         if ud['mode'] == ScrollMode.SCROLL or ud.get('scroll_action'):
