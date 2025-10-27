@@ -2925,7 +2925,7 @@ class ScrollView(StencilView):
         self.fbind('bar_color', self._change_bar_color)
         self._bar_color = self.bar_color
         
-        # DEBUG: Log when timer is scheduled/rescheduled
+        # DEBUG: Log bar fade timer
         vel_x = self.effect_x.velocity if self.effect_x else 0
         vel_y = self.effect_y.velocity if self.effect_y else 0
         overscroll_x = abs(self.effect_x.overscroll) if self.effect_x else 0
