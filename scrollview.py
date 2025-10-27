@@ -154,19 +154,19 @@ and applies appropriate behavior:
 
 **Orthogonal Scrolling** (outer and inner scroll in different directions):
     - Touch scrolling: Each ScrollView handles touches in its scroll direction
-    - Mouse wheel: Scrolls the ScrollView matching the wheel direction
+    - Mouse wheel: Scrolls innermost ScrollView if it can handle the direction
     - Example: Vertical outer + Horizontal inner
 
 **Parallel Scrolling** (outer and inner scroll in the same direction):
     - Touch scrolling: Uses web-style boundary delegation (see below)
-    - Mouse wheel: Scrolls only the ScrollView under the mouse cursor
+    - Mouse wheel: Scrolls innermost ScrollView, no boundary delegation
     - Scrollbar: Does not propagate scroll to the other ScrollView
     - Example: Vertical outer + Vertical inner
 
 **Mixed Scrolling** (outer scrolls XY, inner scrolls single axis, or vice versa):
     - Shared axis: Uses web-style boundary delegation
     - Exclusive axes: Immediate delegation or inner-only scrolling
-    - Mouse wheel: Routes based on axis configuration
+    - Mouse wheel: Scrolls innermost ScrollView if it can handle the direction
     - Example: XY outer + Horizontal inner
 
 
@@ -185,7 +185,7 @@ delegation behavior:
 This behavior can be disabled by setting :attr:`parallel_delegation` to False.
 
 
-Wheel Event Delegation in Nested ScrollViews
+Wheel Behavior in Nested ScrollViews
 --------------------------------------------
 
 When using a mouse scroll wheel (or trackpad equivalent), the ScrollView applies
@@ -210,12 +210,9 @@ experiences.
   innermost ScrollView under the pointer until it can scroll no further, at
   which point further scrolling does not delegate to the parent.
 
-This behavior is always active for wheel events and cannot be changed with
-configuration.
-
-
-
-
+This behavior is always active for wheel events and is NOT affected by
+the :attr:`parallel_delegation` or :attr:`delegate_to_outer` properties,
+which only control touch/touchpad gesture behavior.
 '''
 
 # TODO: create a test suite for the updated ScrollView for the kivy test suite.

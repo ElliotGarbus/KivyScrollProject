@@ -1,4 +1,4 @@
-Updated implementation for ScrollView with full nesting support.  Supports nesting to arbitrary levels.
+Updated implementation for ScrollView with full nesting support. Supports nesting to arbitrary levels.
 
 The on_scroll_events (on_scroll_start, on_scroll_move, and on_stroll_stop) have been updated.
 They now work as expected, firing when the movement starts, continues and stops.
@@ -56,19 +56,81 @@ delegate_to_outer = BooleanProperty(True)
     Example use cases:
         - Set False to lock scrolling to a specific nested level
         - Set False to prevent inner scroll from affecting outer scroll
-    
-    
+
+Nested Scrolling Behavior
+-------------------------
+
+The ScrollView automatically detects the scrolling configuration 
+and applies appropriate behavior:
+
+**Orthogonal Scrolling** (outer and inner scroll in different directions):
+    - Touch scrolling: Each ScrollView handles touches in its scroll direction
+    - Mouse wheel: Scrolls innermost ScrollView if it can handle the direction
+    - Example: Vertical outer + Horizontal inner
+
+**Parallel Scrolling** (outer and inner scroll in the same direction):
+    - Touch scrolling: Uses web-style boundary delegation (see below)
+    - Mouse wheel: Scrolls innermost ScrollView, no boundary delegation
+    - Scrollbar: Does not propagate scroll to the other ScrollView
+    - Example: Vertical outer + Vertical inner
+
+**Mixed Scrolling** (outer scrolls XY, inner scrolls single axis, or vice versa):
+    - Shared axis: Uses web-style boundary delegation
+    - Exclusive axes: Immediate delegation or inner-only scrolling
+    - Mouse wheel: Scrolls innermost ScrollView if it can handle the direction
+    - Example: XY outer + Horizontal inner
+
+
+Web-Style Boundary Delegation
+------------------------------
+
+For parallel and shared-axis scrolling, the ScrollView implements web-style 
+delegation behavior:
+
+    - Touch starts at inner boundary, moves away → delegates to outer immediately
+    - Touch starts at inner boundary, moves inward → scrolls inner only
+    - Touch starts not at boundary → scrolls inner only, never delegates 
+      (even when reaching boundary mid-gesture)
+    - New touch required at boundary to delegate to outer
+
+This behavior can be disabled by setting :attr:`parallel_delegation` to False.
+
+
+Wheel Behavior in Nested ScrollViews
+--------------------------------------------
+
+When using a mouse scroll wheel (or trackpad equivalent), the ScrollView applies
+*web-style* delegation:
+
+- **Wheel events are handled by only the innermost ScrollView under the
+  pointer/cursor.**
+- If that ScrollView cannot scroll further in the wheel's axis, the event is
+  *not propagated* to outer ScrollViews. This matches standard browser and OS
+  behaviors.
+- Outer ScrollViews can only respond to the wheel if the pointer is over their
+  scrollbars *or* if there are no nested ScrollViews at the pointer position.
+
+This prevents "scroll hijacking," ensuring natural, intuitive nested scroll
+experiences.
+
+**Examples:**
+- If you have a vertical ScrollView containing a horizontal ScrollView, and you
+  use the mouse wheel over the inner (horizontal) ScrollView, only the vertical
+  outer ScrollView scrolls (since the direction matches).
+- With two nested vertical ScrollViews, the wheel will only scroll the
+  innermost ScrollView under the pointer until it can scroll no further, at
+  which point further scrolling does not delegate to the parent.
+
+This behavior is always active for wheel events and is NOT affected by
+the :attr:`parallel_delegation` or :attr:`delegate_to_outer` properties,
+which only control touch/touchpad gesture behavior.
+'''
 
 
 
 Key files:
-Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollViewManger to route the touches 
-to the inner and outer ScrollView. Things worked nicely, but I have decided to integrate the capabilities back into
-ScrollView, rather than have two separate widgets.
 
-Directory V1 Two Level Nesting - this version of ScrollView supports two levels of nesting, outer and inner. Obsolte. 
-
-In the main directory I am working to support arbitary levels of nesting scrollview.
+In the main directory:
 
  - scrollview.py - ScrollView with Nesting support
 
@@ -94,3 +156,9 @@ Demonstrations/tests using the updated ScrollView:
 - demo_drag_from_scroll.py - Dragging buttons out of a single ScrollView
 - demo_drag_nested_scroll.py - Dragging buttons out of nested orthogonal ScrollViews 
 
+Obsolete implmentations - how development progressed:
+- Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollViewManger to route the touches 
+to the inner and outer ScrollView. Things worked nicely, but I have decided to integrate the capabilities back into
+ScrollView, rather than have two separate widgets.
+
+- Directory V1 Two Level Nesting - this version of ScrollView supports two levels of nesting, outer and inner.
