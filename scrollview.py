@@ -2240,7 +2240,30 @@ class ScrollView(StencilView):
             if axis_config:
                 touch.ud['nested']['axis_config'] = axis_config
 
-            # Initialize scrolling on the innermost child (handles coordinate transformation)
+            # For wheel events, try each level of hierarchy starting from innermost
+            # Each level decides: handle it, bubble up (delegate_to_outer=True), or consume (delegate_to_outer=False)
+            if is_wheel:
+                # Try each ScrollView in hierarchy from innermost to outermost
+                for i in range(hierarchy.depth - 1, -1, -1):
+                    sv = hierarchy.scrollviews[i]
+                    result = sv._scroll_initialize(touch)
+                    
+                    if result:
+                        # This level handled the wheel event
+                        return True
+                    
+                    # This level couldn't handle it - check delegate_to_outer
+                    if not sv.delegate_to_outer:
+                        # Isolation mode: consume the event (don't bubble further)
+                        return True
+                    
+                    # delegate_to_outer=True: continue to next level up
+                
+                # All levels had delegate_to_outer=True and none could handle it
+                # Let event bubble to parent widgets outside this hierarchy
+                return False
+            
+            # Non-wheel touch: Initialize scrolling on the innermost child (handles coordinate transformation)
             result = self._initialize_nested_inner(touch, inner_sv)
             
             # After initialization, setup delegation modes for ALL ScrollViews in hierarchy
