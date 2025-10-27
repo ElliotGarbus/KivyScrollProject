@@ -828,6 +828,9 @@ class ScrollView(StencilView):
     _bar_color = ListProperty([0, 0, 0, 0])
 
     def _set_viewport_size(self, instance, value):
+        # DEBUG: Track viewport size changes
+        if hasattr(self, 'viewport_size') and self.viewport_size != value:
+            print(f"[VIEWPORT_SIZE] {self._get_debug_name()} changed: {self.viewport_size} -> {value}")
         self.viewport_size = value
 
     def on__viewport(self, instance, value):
@@ -927,21 +930,33 @@ class ScrollView(StencilView):
         if not self._viewport or not self.effect_x:
             return
         scrollable_width = self.width - self.viewport_size[0]
+        old_value = self.effect_x.value
         self.effect_x.min = 0
         self.effect_x.max = min(0, scrollable_width)
         self.effect_x.value = scrollable_width * self.scroll_x
+        
+        # DEBUG: Log if bounds update changed effect value (could trigger loop)
+        if abs(old_value - self.effect_x.value) > 0.01:
+            print(f"[BOUNDS_X] {self._get_debug_name()} effect.value changed: {old_value:.2f} -> {self.effect_x.value:.2f} (scroll_x={self.scroll_x:.3f})")
 
     def _update_effect_y_bounds(self, *args):
         if not self._viewport or not self.effect_y:
             return
         scrollable_height = self.height - self.viewport_size[1]
+        old_value = self.effect_y.value
         self.effect_y.min = 0 if scrollable_height < 0 else scrollable_height
         self.effect_y.max = scrollable_height
         self.effect_y.value = self.effect_y.max * self.scroll_y
+        
+        # DEBUG: Log if bounds update changed effect value (could trigger loop)
+        if abs(old_value - self.effect_y.value) > 0.01:
+            print(f"[BOUNDS_Y] {self._get_debug_name()} effect.value changed: {old_value:.2f} -> {self.effect_y.value:.2f} (scroll_y={self.scroll_y:.3f})")
 
     def _update_effect_bounds(self, *args):
         # "sync up the physics with reality" method 
         # keeps the smooth scrolling effects aligned with the actual ScrollView state
+        # DEBUG: Track when bounds are recalculated (could create feedback loop)
+        print(f"[UPDATE_BOUNDS] {self._get_debug_name()} recalculating effect bounds")
         self._update_effect_x_bounds()
         self._update_effect_y_bounds()
 
