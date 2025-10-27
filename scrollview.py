@@ -967,7 +967,8 @@ class ScrollView(StencilView):
         print(f"[EFFECT_X] {self._get_debug_name()}")
         print(f"  scroll={effect.scroll:.2f} (min={effect.min:.2f}, max={effect.max:.2f}, value={effect.value:.2f})")
         print(f"  velocity={effect.velocity:.4f}, overscroll={effect.overscroll:.2f}")
-        print(f"  at_min={at_min}, at_max={at_max}, scroll_x={self.scroll_x:.3f}")
+        print(f"  friction={effect.friction:.4f}, spring_constant={effect.spring_constant:.4f}")
+        print(f"  is_manual={effect.is_manual}, at_min={at_min}, at_max={at_max}, scroll_x={self.scroll_x:.3f}")
         
         self._trigger_update_from_scroll()
 
@@ -985,7 +986,17 @@ class ScrollView(StencilView):
         if sh != 0:
             sy = self.effect_y.scroll / sh
             self.scroll_y = -sy
-        print(f"[EFFECT_Y] {self._get_debug_name()} effect.scroll={self.effect_y.scroll:.2f}, velocity={self.effect_y.velocity:.4f}, overscroll={self.effect_y.overscroll:.2f}, scroll_y={self.scroll_y:.3f}")
+        
+        # DEBUG: Show detailed effect state to understand why it keeps updating
+        effect = self.effect_y
+        at_min = abs(effect.scroll - effect.min) < 1.0
+        at_max = abs(effect.scroll - effect.max) < 1.0
+        print(f"[EFFECT_Y] {self._get_debug_name()}")
+        print(f"  scroll={effect.scroll:.2f} (min={effect.min:.2f}, max={effect.max:.2f}, value={effect.value:.2f})")
+        print(f"  velocity={effect.velocity:.4f}, overscroll={effect.overscroll:.2f}")
+        print(f"  friction={effect.friction:.4f}, spring_constant={effect.spring_constant:.4f}")
+        print(f"  is_manual={effect.is_manual}, at_min={at_min}, at_max={at_max}, scroll_y={self.scroll_y:.3f}")
+        
         self._trigger_update_from_scroll()
 
     def to_local(self, x, y, **k):
@@ -2890,27 +2901,23 @@ class ScrollView(StencilView):
 
         # New in 1.2.0, show bar when scrolling happens and (changed in 1.9.0)
         # fade to bar_inactive_color when no scroll is happening.
-        # CRITICAL: Only reschedule bar fade timer if there's significant velocity
-        # Tiny oscillations during elastic settling shouldn't keep bar highlighted forever
-        vel_x = self.effect_x.velocity if self.effect_x else 0
-        vel_y = self.effect_y.velocity if self.effect_y else 0
-        has_significant_velocity = abs(vel_x) > 1.0 or abs(vel_y) > 1.0
-        
         ev = self._bind_inactive_bar_color_ev
         if ev is None:
             ev = self._bind_inactive_bar_color_ev = Clock.create_trigger(
                 self._bind_inactive_bar_color, .5)
+        self.funbind('bar_inactive_color', self._change_bar_color)
+        Animation.stop_all(self, '_bar_color')
+        self.fbind('bar_color', self._change_bar_color)
+        self._bar_color = self.bar_color
         
-        # Only reset timer if actively scrolling (not just settling oscillations)
-        if has_significant_velocity or ev.is_triggered == False:
-            self.funbind('bar_inactive_color', self._change_bar_color)
-            Animation.stop_all(self, '_bar_color')
-            self.fbind('bar_color', self._change_bar_color)
-            self._bar_color = self.bar_color
-            print(f"[BAR_FADE] {self._get_debug_name()} scheduling fade timer (vel_x={vel_x:.2f}, vel_y={vel_y:.2f})")
-            ev()
-        else:
-            print(f"[BAR_FADE] {self._get_debug_name()} SKIPPING timer reset (settling: vel_x={vel_x:.4f}, vel_y={vel_y:.4f})")
+        # DEBUG: Log when timer is scheduled/rescheduled
+        vel_x = self.effect_x.velocity if self.effect_x else 0
+        vel_y = self.effect_y.velocity if self.effect_y else 0
+        overscroll_x = abs(self.effect_x.overscroll) if self.effect_x else 0
+        overscroll_y = abs(self.effect_y.overscroll) if self.effect_y else 0
+        print(f"[BAR_FADE] {self._get_debug_name()} scheduling fade timer at scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}, vel_x={vel_x:.4f}, vel_y={vel_y:.4f}, overscroll_x={overscroll_x:.2f}, overscroll_y={overscroll_y:.2f}")
+        
+        ev()
 
     def _bind_inactive_bar_color(self, *args):
         print(f"[BAR_FADE] {self._get_debug_name()} FADE TIMER FIRED - starting fade animation")
