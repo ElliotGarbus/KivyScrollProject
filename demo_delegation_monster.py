@@ -19,7 +19,6 @@ from kivy.uix.button import Button
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.label import Label
 from kivy.metrics import dp
-from kivy.effects.dampedscroll import DampedScrollEffect
 from scrollview import ScrollView
 
 
@@ -422,13 +421,6 @@ class DelegationMonsterDemo(App):
                 bar_width=dp(6),
                 bar_color=[1.0, 0.5, 0.3, 0.8]
             )
-            
-            # TEST: Configure effect with HIGH friction to see if it settles faster at boundaries
-            # Default friction is ~0.05, let's try 2.0 (40x higher)
-            effect = DampedScrollEffect()
-            effect.friction = 2.0
-            inner_sv.effect_x = effect
-            print(f"[TEST] Inner H ScrollView {i} configured with friction={effect.friction}")
             
             inner_content = BoxLayout(
                 orientation='horizontal',

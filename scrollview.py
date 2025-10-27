@@ -959,7 +959,16 @@ class ScrollView(StencilView):
         if sw != 0:
             sx = self.effect_x.scroll / sw
             self.scroll_x = -sx
-        print(f"[EFFECT_X] {self._get_debug_name()} effect.scroll={self.effect_x.scroll:.2f}, velocity={self.effect_x.velocity:.4f}, overscroll={self.effect_x.overscroll:.2f}, scroll_x={self.scroll_x:.3f}")
+        
+        # DEBUG: Show detailed effect state to understand why it keeps updating
+        effect = self.effect_x
+        at_min = abs(effect.scroll - effect.min) < 1.0
+        at_max = abs(effect.scroll - effect.max) < 1.0
+        print(f"[EFFECT_X] {self._get_debug_name()}")
+        print(f"  scroll={effect.scroll:.2f} (min={effect.min:.2f}, max={effect.max:.2f}, value={effect.value:.2f})")
+        print(f"  velocity={effect.velocity:.4f}, overscroll={effect.overscroll:.2f}")
+        print(f"  at_min={at_min}, at_max={at_max}, scroll_x={self.scroll_x:.3f}")
+        
         self._trigger_update_from_scroll()
 
     def _update_effect_y(self, *args):
