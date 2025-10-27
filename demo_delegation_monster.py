@@ -200,7 +200,7 @@ class DelegationMonsterDemo(App):
             instance.text = 'FALSE (Delegation Disabled)'
             instance.background_color = [0.8, 0.2, 0.2, 1]
         
-        # Update all panel scrollviews
+        # Nested inner ScrollViews keep delegate_to_outer=True for touch cascading
         for sv in self.panel_scrollviews:
             sv.delegate_to_outer = new_state
     
