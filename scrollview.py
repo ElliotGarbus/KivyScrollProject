@@ -1726,6 +1726,10 @@ class ScrollView(StencilView):
                     (self.always_overscroll and self.do_scroll_x) or
                     (self._viewport and self._viewport.width > self.width)
             )):
+                # Cannot scroll horizontally - check delegate_to_outer
+                if not self.delegate_to_outer:
+                    # Isolation mode: consume event (do nothing) rather than pass through
+                    return True
                 return False  # Pass to outer ScrollView
         elif btn in self._MOUSE_WHEEL_VERTICAL:
             # Vertical wheel: only handle if we can scroll vertically
@@ -1733,6 +1737,10 @@ class ScrollView(StencilView):
                     (self.always_overscroll and self.do_scroll_y) or
                     (self._viewport and self._viewport.height > self.height)
             )):
+                # Cannot scroll vertically - check delegate_to_outer
+                if not self.delegate_to_outer:
+                    # Isolation mode: consume event (do nothing) rather than pass through
+                    return True
                 return False  # Pass to outer ScrollView
         # Select appropriate scroll effect
         e = self._select_scroll_effect_for_wheel(btn, in_bar_x, in_bar_y)
