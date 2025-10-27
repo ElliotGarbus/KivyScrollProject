@@ -959,6 +959,7 @@ class ScrollView(StencilView):
         if sw != 0:
             sx = self.effect_x.scroll / sw
             self.scroll_x = -sx
+        print(f"[EFFECT_X] {self._get_debug_name()} updating from effect, velocity={self.effect_x.velocity:.2f}, scroll_x={self.scroll_x:.3f}")
         self._trigger_update_from_scroll()
 
     def _update_effect_y(self, *args):
@@ -975,6 +976,7 @@ class ScrollView(StencilView):
         if sh != 0:
             sy = self.effect_y.scroll / sh
             self.scroll_y = -sy
+        print(f"[EFFECT_Y] {self._get_debug_name()} updating from effect, velocity={self.effect_y.velocity:.2f}, scroll_y={self.scroll_y:.3f}")
         self._trigger_update_from_scroll()
 
     def to_local(self, x, y, **k):
@@ -2055,9 +2057,11 @@ class ScrollView(StencilView):
         # When delegating to parent, inner must stop all updates to prevent resetting bar fade timer
         if not_in_bar:
             if self.effect_x:
+                print(f"[CASCADE] {self._get_debug_name()} halting effect_x, velocity={self.effect_x.velocity:.2f}")
                 self.effect_x.velocity = 0
                 self.effect_x.cancel()
             if self.effect_y:
+                print(f"[CASCADE] {self._get_debug_name()} halting effect_y, velocity={self.effect_y.velocity:.2f}")
                 self.effect_y.velocity = 0
                 self.effect_y.cancel()
         
@@ -2092,6 +2096,7 @@ class ScrollView(StencilView):
         # CRITICAL: Trigger bar fade animation since _scroll_finalize won't be called
         # (our uid was deleted above, so _scroll_finalize will early-return)
         # This schedules the 0.5s timer to fade bar from active to inactive color
+        print(f"[CASCADE] {self._get_debug_name()} triggering bar fade at scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}")
         self._trigger_update_from_scroll()
         
         # NOTE: We do NOT handle click passthrough here because the actual
@@ -2880,9 +2885,11 @@ class ScrollView(StencilView):
         Animation.stop_all(self, '_bar_color')
         self.fbind('bar_color', self._change_bar_color)
         self._bar_color = self.bar_color
+        print(f"[BAR_FADE] {self._get_debug_name()} scheduling fade timer at scroll_x={self.scroll_x:.3f}, scroll_y={self.scroll_y:.3f}")
         ev()
 
     def _bind_inactive_bar_color(self, *args):
+        print(f"[BAR_FADE] {self._get_debug_name()} FADE TIMER FIRED - starting fade animation")
         self.funbind('bar_color', self._change_bar_color)
         self.fbind('bar_inactive_color', self._change_bar_color)
         Animation(
