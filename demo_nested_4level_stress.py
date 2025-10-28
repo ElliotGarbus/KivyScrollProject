@@ -33,7 +33,7 @@ class FourLevelStressDemo(App):
         # Title
         title = Label(
             text='4-Level Stress Test (V->H->V->H)\n'
-                 'Maximum nesting depth - tests delegation chain',
+                 'Nesting depth - tests delegation chain',
             size_hint_y=None,
             height=dp(60),
             color=[1, 1, 1, 1],
@@ -90,7 +90,7 @@ class FourLevelStressDemo(App):
         level2_container.bind(minimum_width=level2_container.setter('width'))
         
         # Level 2 content before level 3
-        for i in range(2):
+        for i in range(4):
             btn = Button(
                 text=f'L2\nLeft\n{i+1}\n(H)',
                 size_hint_x=None,
@@ -120,7 +120,7 @@ class FourLevelStressDemo(App):
         level3_container.bind(minimum_height=level3_container.setter('height'))
         
         # Level 3 content before level 4
-        for i in range(2):
+        for i in range(4):
             btn = Button(
                 text=f'L3 Top {i+1} (V)',
                 size_hint_y=None,
@@ -164,7 +164,7 @@ class FourLevelStressDemo(App):
         level3_container.add_widget(level4_sv)
         
         # Level 3 content after level 4
-        for i in range(2):
+        for i in range(4):
             btn = Button(
                 text=f'L3 Bottom {i+1} (V)',
                 size_hint_y=None,
@@ -177,7 +177,7 @@ class FourLevelStressDemo(App):
         level2_container.add_widget(level3_sv)
         
         # Level 2 content after level 3
-        for i in range(2):
+        for i in range(4):
             btn = Button(
                 text=f'L2\nRight\n{i+1}\n(H)',
                 size_hint_x=None,
