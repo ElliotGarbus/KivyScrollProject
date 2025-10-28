@@ -841,8 +841,7 @@ class ScrollView(StencilView):
     
     NOTE: Mouse wheel events are NOT affected by this property. Wheel scrolling
     always uses web-style behavior: scroll the innermost ScrollView under cursor
-    that can handle the direction. This prevents scroll hijacking when inner
-    elements reach boundaries and matches standard web browser UX.
+    that can handle the direction. 
     
     Example use cases:
         - Set False to lock touch scrolling to a specific nested level
