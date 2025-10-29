@@ -215,7 +215,7 @@ the :attr:`parallel_delegation` or :attr:`delegate_to_outer` properties,
 which only control touch/touchpad gesture behavior.
 '''
 
-# TODO: address the numerical instability in DampedScrollView(PR? Document?)
+# TODO: address the numerical instability in DampedScrollView (Future PR)
 # TODO: create a test suite for the updated ScrollView for the kivy test suite.
 # TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
 # TODO: formatting prior to PR
