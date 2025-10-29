@@ -156,6 +156,9 @@ Demonstrations/tests using the updated ScrollView:
 - demo_drag_from_scroll.py - Dragging buttons out of a single ScrollView
 - demo_drag_nested_scroll.py - Dragging buttons out of nested orthogonal ScrollViews 
 
+- demo_recycleview_simple.py - a simple RecycleView, using the new ScrollView
+- demo_reycleview_nested.py - orthogonal nested RecycleView(s)
+
 Obsolete implmentations - how development progressed:
 - Directory "V0 Obsolete" was an initial implementation that uses a NestedScrollViewManger to route the touches 
 to the inner and outer ScrollView. Things worked nicely, but I have decided to integrate the capabilities back into
