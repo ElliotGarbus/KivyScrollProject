@@ -32,8 +32,6 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty
 
 kv = '''
-#:import dp kivy.metrics.dp
-
 # Button widget for inner vertical RecycleViews
 <ItemButton@Button>:
     size_hint_y: None
