@@ -166,69 +166,74 @@ either :attr:`do_scroll_x` or :attr:`do_scroll_y` set to False.
 
 
 **Orthogonal Scrolling** (outer and inner scroll in different directions):
-    - Touch scrolling: Each ScrollView handles touches in its scroll direction
-    - Mouse wheel: Scrolls innermost ScrollView if it can handle the direction
+    - Touch: Each ScrollView scrolls only in its direction
+    - Wheel: Innermost ScrollView scrolls if it supports that axis
     - Example: Vertical outer + Horizontal inner
 
 **Parallel Scrolling** (outer and inner scroll in the same direction):
-    - Touch scrolling: Uses web-style boundary delegation (see below)
-    - Mouse wheel: Scrolls innermost ScrollView, no boundary delegation
-    - Scrollbar: Does not propagate scroll to the other ScrollView
+    - Touch: Web-style boundary delegation (see below)
+    - Wheel: Innermost ScrollView scrolls, no delegation to outer
+    - Scrollbar: Scroll does not affect other ScrollView
     - Example: Vertical outer + Vertical inner
 
-**Mixed Scrolling** (outer scrolls XY, inner scrolls single axis, or vice versa):
-    - Shared axis: Uses web-style boundary delegation
+**Mixed Scrolling** (outer scrolls XY, inner one axis, or vice versa):
+    - Shared axis: Web-style boundary delegation
     - Exclusive axes: Immediate delegation or inner-only scrolling
-    - Mouse wheel: Scrolls innermost ScrollView if it can handle the direction
+    - Wheel: Innermost ScrollView scrolls if it supports the axis
     - Example: XY outer + Horizontal inner
 
 
 Web-Style Boundary Delegation
-------------------------------
+----------------------------
 
-For parallel and shared-axis scrolling, the ScrollView implements web-style 
-delegation behavior:
+For parallel and shared-axis scrolling, ScrollView uses web-style 
+delegation:
 
-    - Touch starts at inner boundary, moves away → delegates to outer immediately
-    - Touch starts at inner boundary, moves inward → scrolls inner only
-    - Touch starts not at boundary → scrolls inner only, never delegates 
-      (even when reaching boundary mid-gesture)
-    - New touch required at boundary to delegate to outer
+    - If a touch starts at the inner boundary and moves out, it delegates 
+      scrolling to the outer ScrollView right away.
+    - If a touch starts at the inner boundary and moves in, only the inner 
+      ScrollView scrolls.
+    - If a touch starts not at a boundary, only the inner ScrollView 
+      scrolls, even if the gesture later reaches a boundary. Delegation to 
+      the outer never occurs mid-gesture in this case.
+    - A new touch starting at the boundary is required to delegate to the 
+      outer.
 
-This behavior can be disabled by setting :attr:`parallel_delegation` to False.
-
+Disable this behavior by setting :attr:`parallel_delegation` to False.
 
 Wheel Behavior in Nested ScrollViews
---------------------------------------------
+------------------------------------
 
-When using a mouse scroll wheel (or trackpad equivalent), the ScrollView applies
-*web-style* delegation:
+When the mouse scroll wheel or a trackpad is used, ScrollView always 
+applies web-style delegation:
 
-- **Wheel events are handled by only the innermost ScrollView under the
-  pointer/cursor.**
-- If that ScrollView cannot scroll further in the wheel's axis, the event is
-  *not propagated* to outer ScrollViews. This matches standard browser and OS
-  behaviors.
-- Outer ScrollViews can only respond to the wheel if the pointer is over their
-  scrollbars *or* if there are no nested ScrollViews at the pointer position.
+  - Only the innermost ScrollView under the pointer/cursor will handle 
+    the wheel event.
+  - If that ScrollView cannot scroll further along the wheel axis, the 
+    event is not propagated to outer ScrollViews. This matches standard 
+    browser and OS behavior.
+  - Outer ScrollViews never respond to wheel events unless the pointer is 
+    over their scrollbars or unless there are no deeper nested 
+    ScrollViews.
 
-This prevents "scroll hijacking," ensuring natural, intuitive nested scroll
-experiences.
+This prevents "scroll hijacking" and provides an intuitive nested scroll 
+experience.
 
 **Examples:**
-- If you have a vertical ScrollView containing a horizontal ScrollView, and you
-  use the mouse wheel over the inner (horizontal) ScrollView, only the vertical
-  outer ScrollView scrolls (since the direction matches).
-- With two nested vertical ScrollViews, the wheel will only scroll the
-  innermost ScrollView under the pointer until it can scroll no further, at
-  which point further scrolling does not delegate to the parent.
+  - In a vertical ScrollView containing a horizontal ScrollView, using the 
+    wheel over the horizontal ScrollView means only the vertical (outer) 
+    ScrollView scrolls, if its direction matches the wheel.
+  - For two nested vertical ScrollViews, the innermost one under the 
+    pointer will scroll with the wheel until it cannot scroll further; 
+    wheel events are not delegated to the parent.
 
-This behavior is always active for wheel events and is NOT affected by
-the :attr:`parallel_delegation` or :attr:`delegate_to_outer` properties,
-which only control touch/touchpad gesture behavior.
+Wheel behavior is always active and is NOT affected by the 
+:attr:`parallel_delegation` or :attr:`delegate_to_outer` properties. 
+Those only control touch and touchpad gesture behavior.
 
     .. versionchanged:: VERSION_NEXT
-    The ScrollView widgetnow supports nesting to arbitrary levels and configurations.
+    The ScrollView widgetnow supports nesting to arbitrary levels 
+    and configurations.
 '''
 
 
