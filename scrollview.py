@@ -143,14 +143,27 @@ All the effects are located in the :mod:`kivy.effects`.
 
 Nested ScrollViews
 ------------------
+An applicaiton can have multiple levels of nested ScrollViews.  The
+ScrollView class manages the hierarchy of nested ScrollViews.
 
-.. versionadded:: NEXT_VERSION
+It is important to set the :attr:`do_scroll_x` and :attr:`do_scroll_y` 
+properties to the correct values for the nested ScrollViews.
+The nested scrolling behavior, described below, is only applied if the 
+:attr:`do_scroll_x` and :attr:`do_scroll_y` properties are set to the 
+appropriate values.  
 
-Nested Scrolling Behavior
--------------------------
+To achieve orthogonal scrolling, for example, the outer 
+ScrollView should have :attr:`do_scroll_x` set to False and the inner 
+ScrollView should have :attr:`do_scroll_y` set to True, or vice versa.
 
-The ScrollView automatically detects the scrolling configuration 
-and applies appropriate behavior:
+For Parallel scrolling, both ScrollViews should have the same value for 
+:attr:`do_scroll_x` and :attr:`do_scroll_y`.  This can allow vertical in 
+vertical,  horizontal in horizontal, or XY in XY scrolling.
+
+For mixed scrolling, the outer ScrollView should have :attr:`do_scroll_x` 
+and :attr:`do_scroll_y` set to True, and the inner ScrollView should have 
+either :attr:`do_scroll_x` or :attr:`do_scroll_y` set to False.
+
 
 **Orthogonal Scrolling** (outer and inner scroll in different directions):
     - Touch scrolling: Each ScrollView handles touches in its scroll direction
@@ -213,12 +226,10 @@ experiences.
 This behavior is always active for wheel events and is NOT affected by
 the :attr:`parallel_delegation` or :attr:`delegate_to_outer` properties,
 which only control touch/touchpad gesture behavior.
-'''
 
-# TODO: address the numerical instability in DampedScrollView (Future PR)
-# TODO: create a test suite for the updated ScrollView for the kivy test suite.
-# TODO: deprecate dispatch_children() and dispatch_generic in _event.pyx
-# TODO: formatting prior to PR
+    .. versionchanged:: VERSION_NEXT
+    The ScrollView widgetnow supports nesting to arbitrary levels and configurations.
+'''
 
 
 __all__ = ('ScrollView', )
