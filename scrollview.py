@@ -2106,9 +2106,6 @@ class ScrollView(StencilView):
         if svavoid_key in touch.ud:
             del touch.ud[svavoid_key]
         
-        # NOTE: We do NOT delete claimed_by_child flag here!
-        # That flag signals that a child widget (button) owns this touch
-        # and on_touch_up needs to see it to know to be transparent
         
         # Update effect bounds
         ev = self._update_effect_bounds_ev
@@ -2673,10 +2670,6 @@ class ScrollView(StencilView):
             # We check AFTER cleanup so hierarchy state is properly finalized
             claimed_by_child = touch.ud.get('sv.claimed_by_child', False)
             
-            # CLEANUP: Clear claimed_by_child flag for touch pool reuse
-            if 'sv.claimed_by_child' in touch.ud:
-                del touch.ud['sv.claimed_by_child']
-            
             # If a child claimed the touch, propagate through widget tree by calling super()
             # This ensures intermediate parent widgets receive on_touch_up events
             # Kivy's grab mechanism will also dispatch to grabbed widgets automatically
@@ -2705,10 +2698,6 @@ class ScrollView(StencilView):
             
             self._handle_focus_behavior(touch, uid_key)
             
-            # CLEANUP: Clear claimed_by_child flag for touch pool reuse
-            if 'sv.claimed_by_child' in touch.ud:
-                del touch.ud['sv.claimed_by_child']
-            
             return True
         
         # Touch not handled by us - delegate to children
@@ -2720,10 +2709,6 @@ class ScrollView(StencilView):
         if self._scroll_finalize(touch):
             touch.ungrab(self)
             self._handle_focus_behavior(touch, uid_key)
-            
-            # CLEANUP: Clear claimed_by_child flag for touch pool reuse
-            if 'sv.claimed_by_child' in touch.ud:
-                del touch.ud['sv.claimed_by_child']
             
             return True
 
