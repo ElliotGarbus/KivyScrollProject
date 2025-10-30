@@ -2852,21 +2852,25 @@ class ScrollView(StencilView):
 
     def on_touch_up(self, touch):
         # SCROLLVIEW TOUCH HANDLING WITH ARBITRARY DEPTH HIERARCHY
-        # =========================================================
-        # Handles touch release for both standalone and nested configurations.
-        # For nested setups (2+ levels), uses current_index to finalize the
-        # correct ScrollView in the chain.
-
-        # CRITICAL: Unschedule the timeout callback to prevent race condition
-        # If the timeout fires during on_touch_up processing, child widgets can
-        # grab the touch too late and never receive on_touch_up (stuck button bug)
+        # ========================================================
+        # Handles touch release for both standalone and nested
+        # configurations. For nested setups (2+ levels), uses
+        # current_index to finalize the correct ScrollView in the
+        # chain.
+        #
+        # CRITICAL: Unschedule the timeout callback to prevent a race
+        # condition. If the timeout fires during on_touch_up
+        # processing, child widgets can grab the touch too late and
+        # never receive on_touch_up (stuck button bug)
         if self._touch is touch:
             Clock.unschedule(self._change_touch_mode)
 
-        # FAST PATH: If ANY nested hierarchy already completed on_touch_up, skip processing
-        # This prevents duplicate processing when non-adjacent delegation creates
-        # multiple hierarchies for the same touch (e.g., 3-level cascade becomes 2-level)
-        # The first hierarchy to complete sets this flag, all others become transparent
+        # FAST PATH: If ANY nested hierarchy already completed on_touch_up,
+        # skip processing. This prevents duplicate processing when
+        # non-adjacent delegation creates multiple hierarchies for the
+        # same touch (e.g., a 3-level cascade becomes a 2-level cascade).
+        # The first hierarchy to complete sets this flag; all others
+        # become transparent.
         if "sv_hierarchy_handled" in touch.ud:
             return False
 
@@ -2920,9 +2924,12 @@ class ScrollView(StencilView):
             # We check AFTER cleanup so hierarchy state is properly finalized
             claimed_by_child = touch.ud.get("sv.claimed_by_child", False)
 
-            # If a child claimed the touch, propagate through widget tree by calling super()
-            # This ensures intermediate parent widgets receive on_touch_up events
-            # Kivy's grab mechanism will also dispatch to grabbed widgets automatically
+            # If a child claimed the touch, propagate through widget tree by
+            # calling super()
+            # This ensures intermediate parent widgets receive on_touch_up
+            # events
+            # Kivy's grab mechanism will also dispatch to grabbed widgets
+            # automatically
             if claimed_by_child:
                 return super(ScrollView, self).on_touch_up(touch)
 
@@ -3271,7 +3278,7 @@ class ScrollView(StencilView):
         # UNIQUE IDENTIFIER GENERATOR FOR TOUCH.UD KEYS
         # ==============================================
         # Generates unique keys for touch.ud (user data) dictionary based on
-        # this ScrollView's unique ID. Critical for nested ScrollView coordination.
+        # this ScrollView's unique ID.
         #
         # USAGE PATTERNS:
         # - _get_uid() -> 'sv.123' (primary state key)
@@ -3294,9 +3301,10 @@ class ScrollView(StencilView):
     def _change_touch_mode(self, *largs):
         # SCROLL TIMEOUT HANDLER - GESTURE DETECTION TIMEOUT
         # ==================================================
-        # This method is called when the scroll_timeout expires without the touch
-        # traveling the minimum scroll_distance. It transitions from scroll detection
-        # mode to normal widget interaction mode by handing off the touch to child widgets.
+        # This method is called when the scroll_timeout expires without the
+        # touch traveling the minimum scroll_distance. It transitions from
+        # scroll detection mode to normal widget interaction mode by handing-off
+        # the touch to child widgets.
         if not self._touch:
             return
 
@@ -3347,7 +3355,7 @@ class ScrollView(StencilView):
         # CONTROLLED HANDOFF TO CHILD WIDGETS:
         # Transform touch coordinates and re-dispatch to children
         # This allows buttons, sliders, etc. to handle the touch normally
-        # NOTE: Do NOT schedule _do_touch_up here - this is a live touch handoff,
+        # NOTE: Do NOT schedule _do_touch_up here, this is a live touch handoff,
         # not a synthetic click. The user is still holding their finger down.
         touch.push()
         touch.apply_transform_2d(self.to_widget)
@@ -3363,7 +3371,7 @@ class ScrollView(StencilView):
             if uid in touch.ud:
                 del touch.ud[uid]
 
-            # Set flag to prevent re-initialization - this touch now belongs to child
+            # Set flag to prevent re-initialization, this touch belongs to child
             touch.ud["sv.claimed_by_child"] = True
 
             # Clear the nested ScrollView active touch since we're handing off
@@ -3375,8 +3383,9 @@ class ScrollView(StencilView):
                 if self._nested_sv_active_touch is touch:
                     self._nested_sv_active_touch = None
         else:
-            # No child grabbed it (e.g., user is on empty space) - transition to SCROLL mode
-            # so the user can begin scrolling without restarting the gesture
+            # No child grabbed it (e.g., user is on empty space) -
+            # transition to SCROLL mode so the user can begin scrolling without
+            # restarting the gesture
             uid = self._get_uid()
             if uid in touch.ud:
                 touch.ud[uid]["mode"] = ScrollMode.SCROLL
@@ -3387,9 +3396,10 @@ class ScrollView(StencilView):
                 self._touch = touch
 
     def _do_touch_up(self, touch, *largs):
-        # Complete touch lifecycle by sending touch_up to all widgets that grabbed this touch.
-        # Ensures proper cleanup for buttons/widgets that were touched during scroll gestures.
-        # touch is in window coords
+        # Complete touch lifecycle by sending touch_up to all widgets that
+        # grabbed this touch.
+        # Ensures proper cleanup for buttons/widgets that were touched
+        # during scroll gestures touch is in window coords
         self._delegate_touch_up_to_children_widget_coords(touch)
         # don't forget about grab event!
         for x in touch.grab_list[:]:
@@ -3415,8 +3425,8 @@ class ScrollView(StencilView):
         on the first scroll wheel event.
 
         .. versionchanged:: NEXT_VERSION
-            Removed touch parameter. Use on_touch_down/move/up for touch-specific
-            handling.
+            Removed touch parameter. Use on_touch_down/move/up for
+            touch-specific handling.
         """
         pass
 
@@ -3425,8 +3435,9 @@ class ScrollView(StencilView):
 
         This event is dispatched whenever the scroll_x or scroll_y properties
         change during an active scroll gesture. It provides a unified way to
-        track scrolling regardless of input method (touch, mouse wheel, scrollbar,
-        or programmatic scroll_x/scroll_y changes).
+        track scrolling regardless of input method.
+        (touch, mouse wheel, scrollbar, or programmatic
+        scroll_x/scroll_y changes).
 
         This event fires continuously during scrolling and is useful for
         implementing scroll-based animations, progress indicators, or parallax
@@ -3442,18 +3453,17 @@ class ScrollView(StencilView):
     def on_scroll_stop(self):
         """Event fired when scrolling motion stops.
 
-        This event is dispatched when the scrolling motion has completely stopped.
-        Fires when both velocity reaches zero and scroll position stabilizes
-        for 3 consecutive frames.
+        This event is dispatched when the scrolling motion has completely
+        stopped.  Fires when both velocity reaches zero and scroll position
+        stabilizes for 3 consecutive frames.
 
         This event is useful for triggering actions after scrolling completes,
         such as loading more content, snapping to grid positions, or updating
         UI state.
 
         .. versionchanged:: NEXT_VERSION
-            Removed touch parameter. Use on_touch_down/move/up for touch-specific
-            handling. Improved detection to use hybrid velocity/position checking
-            for more reliable stop detection across all scroll effects.
+            Removed touch parameter. Use on_touch_down/move/up for
+            touch-specific handling.
         """
         pass
 
