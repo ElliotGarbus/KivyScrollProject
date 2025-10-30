@@ -2417,13 +2417,14 @@ class ScrollView(StencilView):
 
         # NESTED DETECTION via touch event flow:
         # Parent widgets receive touches BEFORE children in Kivy.
-        # - If 'nested' NOT in touch.ud: We're the FIRST ScrollView to see this touch
-        #   (either outer or standalone - check for children below)
+        # - If 'nested' NOT in touch.ud: We're the FIRST ScrollView to see
+        #   this touch (either outer or standalone - check for children below)
         # - If 'nested' IN touch.ud: We're an INNER ScrollView
         #   (parent already set up coordination - process as inner)
 
-        # Check if touch is on OUR scrollbar - if so, handle it directly (don't look for children)
-        # This ensures outer scrollbar works even when there are inner ScrollViews
+        # Check if touch is on OUR scrollbar -
+        # if so, handle it directly (don't look for children)
+        # This ensures outer scrollbar works even when there are inner SVs
         in_bar_x, in_bar_y = self._check_scroll_bounds(touch)
         if in_bar_x or in_bar_y:
             # Touch is on our scrollbar - handle it directly
@@ -2448,8 +2449,8 @@ class ScrollView(StencilView):
             outer_sv = hierarchy.outer
             inner_sv = hierarchy.inner  # Innermost (deepest) ScrollView
 
-            # Get config for the LAST relationship (inner with its immediate parent)
-            # This maintains compatibility with existing 2-level delegation logic
+            # Get config for the LAST relationship
+            # (inner with its immediate parent)
             config_type = hierarchy.get_classification(hierarchy.depth - 1)
             axis_config = hierarchy.get_axis_config(hierarchy.depth - 1)
 
@@ -2467,7 +2468,8 @@ class ScrollView(StencilView):
             if axis_config:
                 touch.ud["nested"]["axis_config"] = axis_config
 
-            # WEB-STYLE WHEEL BEHAVIOR: Wheel scrolls ONLY innermost ScrollView under cursor
+            # WEB-STYLE WHEEL BEHAVIOR: Wheel scrolls ONLY innermost ScrollView
+            # under cursor
             # No delegation through hierarchy - matches standard web browser UX
             if is_wheel:
                 # Try only the innermost ScrollView
@@ -2477,11 +2479,14 @@ class ScrollView(StencilView):
                 # This prevents scroll hijacking when inner reaches boundary
                 return False
 
-            # Non-wheel touch: Initialize scrolling on the innermost child (handles coordinate transformation)
+            # Non-wheel touch: Initialize scrolling on the innermost child
+            # (handles coordinate transformation)
             result = self._initialize_nested_inner(touch, inner_sv)
 
-            # After initialization, setup delegation modes for ALL ScrollViews in hierarchy
-            # (The innermost already had its mode set by _setup_boundary_delegation in _scroll_initialize)
+            # After initialization, setup delegation modes for ALL ScrollViews
+            # in hierarchy
+            # (The innermost already had its mode set by
+            # _setup_boundary_delegation in _scroll_initialize)
             # Now check the other levels in the hierarchy
             if result and "nested" in touch.ud:
                 for i in range(
@@ -2519,7 +2524,8 @@ class ScrollView(StencilView):
             # Only grab if we actually set up scroll state
             uid = self._get_uid()
             if uid in touch.ud:
-                # We set up scroll state - claim this touch to prevent multi-touch scrolling
+                # We set up scroll state -
+                # claim this touch to ensure only one active touch
                 self._nested_sv_active_touch = touch
                 touch.grab(self)
             return True
@@ -2537,8 +2543,9 @@ class ScrollView(StencilView):
         if touch.ud.get("sv.claimed_by_child", False):
             return False
 
-        # Skip collision check if we're the inner in a nested setup and parent already validated
-        # (parent called us directly after finding us with _find_child_scrollview_at_touch)
+        # Skip collision check if we're the inner in a nested setup and parent
+        # already validated (parent called us directly after finding us
+        # with _find_child_scrollview_at_touch)
         skip_collision = (
             "nested" in touch.ud
             and "hierarchy" in touch.ud["nested"]
@@ -2553,18 +2560,19 @@ class ScrollView(StencilView):
             return True
 
         if self._touch:
-            # Already handling a touch - reject this one to enforce single-touch policy
+            # Already handling a touch - reject this one to enforce single-touch
             # EXCEPT for mouse wheel events which are independent
             is_wheel = "button" in touch.profile and touch.button.startswith(
                 "scroll"
             )
             if not is_wheel:
                 return False
-            # For wheel events, continue processing even if we have an active touch
+            # For wheel events, continue even if we have an active touch
 
         if not (self.do_scroll_x or self.do_scroll_y):
             # Scrolling is disabled for both axes
-            # Re-dispatch to child content so non-scroll interactions (e.g., buttons) still work
+            # Re-dispatch to child content so non-scroll interactions
+            # (e.g., buttons) still work
             return self._simulate_touch_down(touch)
 
         # Handle mouse scrolling, only if the viewport size is bigger than the
@@ -2652,9 +2660,8 @@ class ScrollView(StencilView):
             # Get the ScrollView that should handle this touch
             current_sv = hierarchy.scrollviews[current_index]
 
-            # Check if child widget claimed the touch - be transparent, propagate to children
+            # Check if child widget claimed the touch - propagate to children
             if touch.ud.get("sv.claimed_by_child", False):
-                # Don't process scroll, but let touch propagate through widget tree
                 return super(ScrollView, self).on_touch_move(touch)
 
             # Route to current handler
@@ -2680,29 +2687,35 @@ class ScrollView(StencilView):
                         return True
 
                     # Current ScrollView rejected - cascade up the chain
-                    # The _should_delegate_* methods already handle boundary logic and return True/False
-                    # If they return True (delegate), we should cascade regardless of mode
+                    # The _should_delegate_* methods already handle boundary
+                    # logic and return True/False.  If they return
+                    # True (delegate), we should cascade regardless of mode
                     if current_index > 0:
                         # Move up to parent in chain
                         child_sv = current_sv
 
-                        # PHASE 8: Check if we should skip to a non-adjacent parallel ancestor
+                        # Check if we should skip to a non-adjacent
+                        # parallel ancestor
                         if "parallel_ancestor_index" in nested_data:
-                            # Non-adjacent parallel delegation (e.g., V->H->V, skip H, go to outer V)
+                            # Non-adjacent parallel delegation
+                            # (e.g., V->H->V, skip H, go to outer V)
                             new_index = nested_data["parallel_ancestor_index"]
                             del nested_data[
                                 "parallel_ancestor_index"
                             ]  # One-time use
 
-                            # Finalize any intermediate ScrollViews that we're skipping over
-                            # This ensures their touch state is cleaned up even though they never handled this touch
+                            # Finalize any intermediate ScrollViews that we're
+                            # skipping over
+                            # This ensures their touch state is cleaned up even
+                            # though they never handled this touch
                             for skip_idx in range(
                                 current_index - 1, new_index, -1
                             ):
                                 skipped_sv = hierarchy.scrollviews[skip_idx]
                                 skipped_uid = skipped_sv._get_uid()
                                 if skipped_uid in touch.ud:
-                                    # This intermediate ScrollView has touch data - clean it up
+                                    # This intermediate ScrollView has touch
+                                    # data - clean it up
                                     touch.push()
                                     touch.apply_transform_2d(
                                         skipped_sv.parent.to_widget
@@ -2723,7 +2736,8 @@ class ScrollView(StencilView):
                         # Initialize parent's scroll state if not already set up
                         parent_uid = parent_sv._get_uid()
                         if parent_uid not in touch.ud:
-                            # Set to UNKNOWN so parent can detect scroll intent on next move
+                            # Set to UNKNOWN so parent can detect scroll
+                            # intent on next move
                             touch.ud[parent_uid] = {
                                 "mode": ScrollMode.UNKNOWN,
                                 "dx": 0,
@@ -2732,7 +2746,8 @@ class ScrollView(StencilView):
                                 "frames": 0,
                                 "can_defocus": False,
                             }
-                            # Transform touch to parent's space before initializing effects
+                            # Transform touch to parent's space before
+                            # initializing effects
                             touch.push()
                             touch.apply_transform_2d(parent_sv.parent.to_widget)
                             parent_sv._initialize_scroll_effects(
@@ -2744,27 +2759,32 @@ class ScrollView(StencilView):
                             parent_sv.dispatch("on_scroll_start")
 
                             # CRITICAL: Finalize child's scroll when cascading
-                            # This stops effects AND schedules on_scroll_stop event
-                            # But doesn't interfere with normal on_touch_up to buttons/widgets
+                            # This stops effects AND schedules
+                            # on_scroll_stop event
+                            # But doesn't interfere with normal
+                            # on_touch_up to buttons/widgets
                             touch.push()
                             touch.apply_transform_2d(child_sv.parent.to_widget)
                             child_sv._finalize_scroll_for_cascade(touch)
                             touch.pop()
 
-                            # Extra safety: If child had _touch set but no scroll state,
-                            # clear it to prevent it from blocking future touches
+                            # Extra safety: If child had _touch set but
+                            # no scroll state, clear it to prevent
+                            # blocking future touches
                             if child_sv._touch is touch:
                                 child_sv._touch = None
 
-                            # Parent just initialized - return True and let next touch_move handle it
-                            # This prevents immediate cascading in the same event
+                            # Parent just initialized - return True and let next
+                            # touch_move handle it
+                            # This prevents immediate cascading
+                            # in the same event
                             return True
 
-                        # Parent already initialized - try it now (continue loop)
-                        # Continue loop to try parent
+                        # Parent already initialized
                         continue
                     else:
-                        # At outer level and it rejected - shouldn't happen but return False
+                        # At outer level, and it rejected -
+                        # shouldn't happen but return False
                         return False
 
         # STANDALONE: Standard single-touch processing
@@ -2786,7 +2806,8 @@ class ScrollView(StencilView):
         return self._scroll_update(touch)
 
     def _scroll_update(self, touch):
-        # Second phase of scroll gesture - updates scroll effects during movement.
+        # Second phase of scroll gesture -
+        # updates scroll effects during movement.
         #
         # Handles mode detection (unknown -> scroll), nested delegation checks,
         # and axis-specific scroll processing.
@@ -2795,7 +2816,7 @@ class ScrollView(StencilView):
         if self._get_uid("svavoid") in touch.ud:
             return False
         if touch.ud.get("sv.claimed_by_child", False):
-            # Child widget claimed touch - be transparent, propagate through widget tree
+            # Child widget claimed touch - propagate through widget tree
             return super(ScrollView, self).on_touch_move(touch)
 
         # Allow this touch to defocus focused widgets (default behavior)
