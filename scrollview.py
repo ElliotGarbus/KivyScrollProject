@@ -2290,80 +2290,111 @@ class ScrollView(StencilView):
     #
     # TOUCH USER DATA (touch.ud) KEY DOCUMENTATION
     # ============================================
-    # This section documents all touch.ud keys used across ScrollView,
+    # This section documents all touch.ud keys used across ScrollView.
     #
     # KEY NAMING CONVENTIONS:
     # ----------------------
     #
     # PER-INSTANCE 'sv.' NAMESPACE:
     # -----------------------------
-    # ScrollView uses 'sv.' prefixed keys via _get_uid() to create instance-specific
-    # keys like 'sv.123' where 123 is the widget's unique ID. Each ScrollView only
-    # checks its own keys - they do NOT share or coordinate via these keys.
+    # ScrollView uses 'sv.' prefixed keys via _get_uid() to create
+    # instance-specific keys like 'sv.123', where 123 is the widget's
+    # unique ID. Each ScrollView only checks its own keys - they do NOT
+    # share or coordinate via these keys.
     #
     # Per-ScrollView Instance Keys:
     # - sv.<uid>: Primary state dict for this ScrollView instance
-    #   Contains: {
-    #     'mode': ScrollMode,   # State machine: UNKNOWN (detecting intent) -> SCROLL (confirmed)
-    #     'dx': float,          # accumulated absolute X movement for detection
-    #     'dy': float,          # accumulated absolute Y movement for detection
-    #     'scroll_action': bool,# True if touch started in scrollbar (skips on_scroll_start dispatch)
-    #     'frames': int,        # Clock.frames at touch start (slow device timing)
-    #     'can_defocus': bool,  # Whether this touch can defocus focused widgets
-    #   }
+    #   Contains:
+    #     {
+    #       'mode': ScrollMode,   # State: UNKNOWN (detecting intent)
+    #                            #   -> SCROLL (confirmed)
+    #       'dx': float,         # accumulated absolute X movement
+    #                            #   for detection
+    #       'dy': float,         # accumulated absolute Y movement
+    #                            #   for detection
+    #       'scroll_action': bool,  # True if touch started in scrollbar
+    #                            # (skips on_scroll_start dispatch)
+    #       'frames': int,       # Clock.frames at touch start (timing)
+    #       'can_defocus': bool, # Whether this touch can defocus
+    #                            # focused widgets
+    #     }
     #
-    # - svavoid.<uid>: Flag indicating this ScrollView should avoid handling this touch
-    #   Set when: Mouse wheel events are handled, or touch doesn't collide
+    # - svavoid.<uid>: Flag indicating this ScrollView should avoid
+    #   handling this touch
+    #   Set when: Mouse wheel events are handled, or touch doesn't
+    #   collide
     #   Purpose: Prevents double-processing of already-handled touches
     #
-    #   Note: Each widget (ScrollView, DragBehavior) has its own UID-namespaced svavoid key.
-    #         Widgets do NOT coordinate via svavoid - each checks only its own key.
+    #   Note: Each widget (ScrollView, DragBehavior) has its own
+    #   UID-namespaced svavoid key. Widgets do NOT coordinate via svavoid
+    #   - each checks only its own key.
     #
     # Cross-ScrollView Shared Keys:
     # - sv.handled: dict {'x': bool, 'y': bool}
     #   Purpose: Tracks which axes have been processed by a ScrollView
-    #   Lifecycle: Set at start of on_touch_move, updated during scroll processing
+    #   Lifecycle: Set at start of on_touch_move, updated during scroll
+    #   processing
     #
     # - sv.claimed_by_child: bool
-    #   Set when: _change_touch_mode delegates touch to children and child grabs (timeout expired)
-    #   Purpose: Signals that a child widget (button, etc.) has claimed this touch.
-    #            Prevents ANY ScrollView from processing scroll gestures.
-    #            ScrollView becomes transparent, calling super() to propagate touch properly.
-    #   Used in: _scroll_initialize, on_touch_move, and on_touch_up
-    #   Lifecycle: Set in _change_touch_mode when child grabs, cleared in on_touch_up
+    #   Set when: _change_touch_mode delegates touch to children and
+    #   child grabs (timeout expired)
+    #   Purpose: Signals a child widget (button, etc.) has claimed this
+    #   touch. Prevents ANY ScrollView from processing scroll gestures.
+    #   ScrollView becomes transparent, calling super() to propagate
+    #   touch properly.
+    #   Used in: _scroll_initialize, on_touch_move, on_touch_up
+    #   Lifecycle: Set in _change_touch_mode when child grabs, cleared
+    #   in on_touch_up
     #
     # - sv.can_defocus: bool
-    #   Purpose: Controls whether FocusBehavior should defocus on this touch
+    #   Purpose: Controls whether FocusBehavior should defocus on this
+    #   touch
     #   Set to False when: Touch results in actual scrolling
     #   Used in: on_touch_up to prevent defocus after scroll gestures
     #
-    # NESTED SCROLLVIEW NAMESPACE (Arbitrary Depth Support):
+    # NESTED SCROLLVIEW NAMESPACE
+    # (Arbitrary Depth Support):
     # -------------------------------------------------------
-    # - nested: dict - Nested ScrollView coordination state for arbitrary depth hierarchies
-    #   Contains: {
-    #     'hierarchy': ScrollViewHierarchy,  # Chain of nested ScrollViews (2+ levels)
-    #     'current_index': int,              # Index of ScrollView currently handling touch
-    #     'parallel_ancestor_index': int (optional),  # For non-adjacent delegation
-    #   }
-    #   Purpose: Coordinates touches across multiple levels of nested ScrollViews
-    #   Lifecycle: Built in outer's on_touch_down, updated during cascade in on_touch_move
+    # - nested: dict - Nested ScrollView coordination state for
+    #   arbitrary depth hierarchies
+    #   Contains:
+    #     {
+    #       'hierarchy': ScrollViewHierarchy,    # Chain of nested
+    #                                 # ScrollViews (2+ levels)
+    #       'current_index': int,     # Index of ScrollView currently
+    #                                 # handling touch
+    #       'parallel_ancestor_index': int (optional),  # For
+    #                                 # non-adjacent delegation
+    #     }
+    #   Purpose: Coordinates touches across multiple levels of nested
+    #   ScrollViews
+    #   Lifecycle: Built in outer's on_touch_down, updated during
+    #   cascade in on_touch_move
     #
-    # - sv_hierarchy_handled: bool - Global flag indicating hierarchy coordination is complete
-    #   Set when: Outer ScrollView completes on_touch_up coordination (line 2623)
-    #   Purpose: Prevents multiple hierarchies from interfering with each other
-    #            This occurs in non-adjacent delegation when skip-level cascade
-    #            creates a shallower hierarchy (e.g., 3-level becomes 2-level)
-    #   Used in: on_touch_up to make all ScrollViews transparent after coordination done
-    #   Lifecycle: Set once by first hierarchy to complete, checked by all ScrollViews
+    # - sv_hierarchy_handled: bool
+    #   Global flag indicating hierarchy coordination is complete
+    #   Set when: Outer ScrollView completes on_touch_up coordination
+    #   (line 2623)
+    #   Purpose: Prevents multiple hierarchies from interfering with
+    #   each other. This occurs in non-adjacent delegation when
+    #   skip-level cascade creates a shallower hierarchy (e.g.,
+    #   3-level becomes 2-level)
+    #   Used in: on_touch_up to make all ScrollViews transparent after
+    #   coordination done
+    #   Lifecycle: Set once by first hierarchy to complete, checked by
+    #   all ScrollViews
     #
-    # GLOBAL SCROLLBAR FLAGS (No Namespacing Required):
+    # GLOBAL SCROLLBAR FLAGS
+    # (No Namespacing Required):
     # --------------------------------------------------
     # - in_bar_x: bool - Touch started on horizontal scroll bar
     # - in_bar_y: bool - Touch started on vertical scroll bar
     #   Purpose: Differentiates bar dragging from content scrolling
-    #   Affects: Touch routing, effect handling, movement calculations, delegation
-    #   Rationale: Scroll bars are positioned at widget edges and cannot overlap,
-    #              so multiple ScrollViews can safely share these global flags
+    #   Affects: Touch routing, effect handling, movement calculations,
+    #   delegation
+    #   Rationale: Scroll bars are positioned at widget edges and cannot
+    #   overlap, so multiple ScrollViews can safely share these global
+    #   flags
 
     # =========================================================================
     # MAIN TOUCH HANDLING METHODS (in lifecycle order)
