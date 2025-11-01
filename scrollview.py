@@ -143,7 +143,7 @@ All the effects are located in the :mod:`kivy.effects`.
 
 Nested ScrollViews
 ------------------
-An applicaiton can have multiple levels of nested ScrollViews.  The
+An application can have multiple levels of nested ScrollViews.  The
 ScrollView class manages the hierarchy of nested ScrollViews.
 
 It is important to set the :attr:`do_scroll_x` and :attr:`do_scroll_y`
