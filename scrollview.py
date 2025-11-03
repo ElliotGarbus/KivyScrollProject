@@ -2566,6 +2566,24 @@ class ScrollView(StencilView):
                 "scroll"
             )
             if not is_wheel:
+                # DEBUG: Check if stored touch is stale
+                uid = self._get_uid()
+                touch_has_uid = uid in self._touch.ud
+                touch_in_grab_list = any(
+                    ref() is self for ref in (self._touch.grab_list or [])
+                )
+                print(f'\n=== SCROLLVIEW TOUCH CHECK ===')
+                print(f'  self._touch: {self._touch}')
+                print(f'  new touch: {touch}')
+                print(f'  uid in old touch.ud: {touch_has_uid}')
+                print(f'  self in old grab_list: {touch_in_grab_list}')
+                print(f'  old touch.ud keys: {list(self._touch.ud.keys())}')
+                print(f'  old grab_list: {[ref() for ref in (self._touch.grab_list or [])]}')
+                if not touch_has_uid and not touch_in_grab_list:
+                    print(f'  >>> STALE TOUCH DETECTED - would clear self._touch')
+                else:
+                    print(f'  >>> Touch still active - rejecting new touch')
+                print(f'=============================\n')
                 return False
             # For wheel events, continue even if we have an active touch
 
@@ -2613,6 +2631,11 @@ class ScrollView(StencilView):
 
         # No mouse scrolling, the user is going to drag the scrollview with
         # this touch.
+        print(f'\n=== SETTING self._touch ===')
+        print(f'  ScrollView: {self}')
+        print(f'  touch: {touch}')
+        print(f'  touch.pos: {touch.pos}')
+        print(f'===========================\n')
         self._touch = touch
         # Set the touch state for this touch
         uid = self._get_uid()
@@ -2862,6 +2885,16 @@ class ScrollView(StencilView):
         # condition. If the timeout fires during on_touch_up
         # processing, child widgets can grab the touch too late and
         # never receive on_touch_up (stuck button bug)
+        
+        print(f'\n=== on_touch_up CALLED ===')
+        print(f'  ScrollView: {self}')
+        print(f'  touch: {touch}')
+        print(f'  self._touch: {self._touch}')
+        print(f'  self._touch is touch: {self._touch is touch}')
+        print(f'  touch.pos: {touch.pos}')
+        print(f'  collide_point: {self.collide_point(*touch.pos)}')
+        print(f'==========================\n')
+        
         if self._touch is touch:
             Clock.unschedule(self._change_touch_mode)
 
@@ -2973,6 +3006,11 @@ class ScrollView(StencilView):
         # SCROLL COMPLETION AND FINAL CLEANUP, called from on_touch_up
         # This method handles the end of scroll gestures and performs cleanup.
 
+        print(f'\n=== CLEARING self._touch in _scroll_finalize ===')
+        print(f'  ScrollView: {self}')
+        print(f'  touch: {touch}')
+        print(f'  self._touch was: {self._touch}')
+        print(f'================================================\n')
         self._touch = None  # Clear our active touch reference
 
         # Early exit if this ScrollView never handled this touch:
