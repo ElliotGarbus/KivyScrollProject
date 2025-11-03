@@ -2578,6 +2578,7 @@ class ScrollView(StencilView):
                 
                 if touch_is_stale:
                     # Clear the stale touch reference
+                    print('touch is stale, clearing self._touch')
                     self._touch = None
                     # Fall through to process the new touch
                 else:
