@@ -2578,7 +2578,6 @@ class ScrollView(StencilView):
                 
                 if touch_is_stale:
                     # Clear the stale touch reference
-                    print('touch is stale, clearing self._touch')
                     self._touch = None
                     # Fall through to process the new touch
                 else:
@@ -2936,6 +2935,14 @@ class ScrollView(StencilView):
 
             # Mark that ScrollView hierarchy handling is complete
             touch.ud["sv_hierarchy_handled"] = True
+            
+            # BUGFIX: Proactively clear _touch for ALL ScrollViews in hierarchy
+            # This prevents stale touch references when intermediate ScrollViews
+            # had _touch set but didn't call _scroll_finalize themselves
+            for sv in hierarchy.scrollviews:
+                if sv._touch is touch:
+                    print(f'clearing stale _touch for {sv}')
+                    sv._touch = None
 
             # CRITICAL: Check if a child widget (button) claimed this touch
             # We check AFTER cleanup so hierarchy state is properly finalized
