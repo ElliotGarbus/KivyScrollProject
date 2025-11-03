@@ -1,0 +1,102 @@
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11134b690>
+  touch: <MouseMotionEvent spos=(0.376720901126408, 0.6427378964941569) pos=(602.3767209011264, 770.6427378964942)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (602.3767209011264, 770.6427378964942)
+  collide_point: True
+==========================
+
+
+=== SCROLLVIEW TOUCH CHECK ===
+  self._touch: <MouseMotionEvent spos=(0.376720901126408, 0.4691151919866444) pos=(602.3767209011264, 562.4691151919867)>
+  new touch: <MouseMotionEvent spos=(0.21151439299123906, 0.4824707846410684) pos=(318.21151439299126, 1598.482470784641)>
+  uid in old touch.ud: True
+  self in old grab_list: False
+  old touch.ud keys: ['nested', 'in_bar_x', 'in_bar_y', 'sv.handled', 'sv.can_defocus', 'sv.11', 'sv.380', 'sv_hierarchy_handled']
+  old grab_list: []
+  >>> Touch still active - rejecting new touch
+=============================
+
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11143fd90>
+  touch: <MouseMotionEvent spos=(0.4130162703379224, 0.44574290484140233) pos=(660.4130162703378, 534.4457429048414)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (660.4130162703378, 534.4457429048414)
+  collide_point: False
+==========================
+
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11134b690>
+  touch: <MouseMotionEvent spos=(0.4130162703379224, 0.44574290484140233) pos=(660.4130162703378, 534.4457429048414)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (660.4130162703378, 534.4457429048414)
+  collide_point: True
+==========================
+
+
+=== SCROLLVIEW TOUCH CHECK ===
+  self._touch: <MouseMotionEvent spos=(0.376720901126408, 0.4691151919866444) pos=(602.3767209011264, 562.4691151919867)>
+  new touch: <MouseMotionEvent spos=(0.37546933667083854, 0.39565943238731216) pos=(580.3754693366708, 1494.3956594323872)>
+  uid in old touch.ud: True
+  self in old grab_list: False
+  old touch.ud keys: ['nested', 'in_bar_x', 'in_bar_y', 'sv.handled', 'sv.can_defocus', 'sv.11', 'sv.380', 'sv_hierarchy_handled']
+  old grab_list: []
+  >>> Touch still active - rejecting new touch
+=============================
+
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11143fd90>
+  touch: <MouseMotionEvent spos=(0.19524405506883605, 0.41903171953255425) pos=(312.1952440550688, 502.41903171953254)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (312.1952440550688, 502.41903171953254)
+  collide_point: False
+==========================
+
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11134b690>
+  touch: <MouseMotionEvent spos=(0.19524405506883605, 0.41903171953255425) pos=(312.1952440550688, 502.41903171953254)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (312.1952440550688, 502.41903171953254)
+  collide_point: True
+==========================
+
+
+=== SCROLLVIEW TOUCH CHECK ===
+  self._touch: <MouseMotionEvent spos=(0.376720901126408, 0.4691151919866444) pos=(602.3767209011264, 562.4691151919867)>
+  new touch: <MouseMotionEvent spos=(0.28660826032540676, 0.39732888146911516) pos=(438.2866082603254, 1496.397328881469)>
+  uid in old touch.ud: True
+  self in old grab_list: False
+  old touch.ud keys: ['nested', 'in_bar_x', 'in_bar_y', 'sv.handled', 'sv.can_defocus', 'sv.11', 'sv.380', 'sv_hierarchy_handled']
+  old grab_list: []
+  >>> Touch still active - rejecting new touch
+=============================
+
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11143fd90>
+  touch: <MouseMotionEvent spos=(0.15269086357947434, 0.40567612687813026) pos=(244.15269086357947, 486.4056761268782)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (244.15269086357947, 486.4056761268782)
+  collide_point: False
+==========================
+
+
+=== on_touch_up CALLED ===
+  ScrollView: <scrollview.ScrollView object at 0x11134b690>
+  touch: <MouseMotionEvent spos=(0.15269086357947434, 0.40567612687813026) pos=(244.15269086357947, 486.4056761268782)>
+  self._touch: None
+  self._touch is touch: False
+  touch.pos: (244.15269086357947, 486.4056761268782)
+  collide_point: True
+==========================
