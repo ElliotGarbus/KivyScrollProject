@@ -841,13 +841,13 @@ class ScrollView(StencilView):
 
     slow_device_support = BooleanProperty(False)
     """Enable slow device support for scroll gesture detection.
-    
+
     On very slow devices, at least 3 frames are needed to accumulate
     velocity data for scroll effects to work properly. When enabled,
     after the scroll timeout expires, the gesture handoff will be delayed
     until at least 3 frames have rendered, ensuring sufficient velocity
     data accumulation.
-    
+
     This addresses issues #1464 and #1499 for low-performance devices.
     Disable this on modern hardware to improve touch responsiveness.
 
@@ -858,14 +858,14 @@ class ScrollView(StencilView):
     """
     parallel_delegation = BooleanProperty(True)
     """Controls boundary delegation behavior for parallel nested ScrollViews.
-    
+
     When True (default, web-style):
         - Touch starting at inner boundary, moving away → delegates to outer
         - Touch starting not at boundary → scrolls inner only, never delegates
-    
+
     When False:
         - No delegation, only touched ScrollView scrolls
-    
+
     :attr:`parallel_delegation` is a :class:`~kivy.properties.BooleanProperty`
     and defaults to True.
 
@@ -874,27 +874,27 @@ class ScrollView(StencilView):
 
     delegate_to_outer = BooleanProperty(True)
     """Controls whether touch scroll gestures delegate to outer ScrollViews.
-    
+
     When True (default):
         - Orthogonal: Cross-axis gestures immediately delegate to outer
           (e.g., horizontal swipe in vertical-only ScrollView)
-        - Parallel: At boundaries, delegates to outer 
+        - Parallel: At boundaries, delegates to outer
           (respects parallel_delegation)
-        - Arbitrary depth: Continues searching up hierarchy for 
+        - Arbitrary depth: Continues searching up hierarchy for
           capable ScrollView
-    
+
     When False:
         - No delegation to outer ScrollViews
         - Only the directly touched ScrollView handles the gesture
-    
+
     NOTE: Mouse wheel events are NOT affected by this property. Wheel scrolling
     always uses web-style behavior: scroll the innermost ScrollView under cursor
-    that can handle the direction. 
-    
+    that can handle the direction.
+
     Example use cases:
         - Set False to lock touch scrolling to a specific nested level
         - Set False to prevent inner touch scroll from affecting outer scroll
-    
+
     :attr:`delegate_to_outer` is a :class:`~kivy.properties.BooleanProperty`
     and defaults to True.
 
@@ -1229,9 +1229,8 @@ class ScrollView(StencilView):
 
         while current_sv:
             # Classify this parent-child relationship
-            config_type, axis_config = parent_sv._classify_nested_configuration(
-                current_sv
-            )
+            config_type, axis_config = (
+                parent_sv._classify_nested_configuration(current_sv))
 
             # Add to hierarchy
             hierarchy.add_child(current_sv, config_type, axis_config)
@@ -1438,7 +1437,8 @@ class ScrollView(StencilView):
     # TOUCH HANDLER HELPER METHODS
     # =========================================================================
     # The following helper methods support the main touch handling lifecycle.
-    # They are organized by purpose: detection, delegation, intent, finalization.
+    # They are organized by purpose: detection, delegation, intent,
+    # finalization.
 
     def _setup_boundary_delegation(self, touch, in_bar):
         # Configure web-style boundary delegation for parallel nested scrolling.
@@ -2566,16 +2566,17 @@ class ScrollView(StencilView):
                 "scroll"
             )
             if not is_wheel:
-                # BUGFIX: Check if stored touch is stale (completed but not cleaned up)
+                # Check if stored touch is stale (completed but not cleaned up)
                 # This happens when a touch completes via hierarchy handling but
                 # this ScrollView wasn't the one that called _scroll_finalize
+                # This is defensive. All _touch are cleared in scroll_finalize
                 touch_is_stale = (
                     'sv_hierarchy_handled' in self._touch.ud  # Touch completed
                     and not any(
                         ref() is self for ref in (self._touch.grab_list or [])
                     )  # We're not in grab list
                 )
-                
+
                 if touch_is_stale:
                     # Clear the stale touch reference
                     self._touch = None
@@ -2935,13 +2936,12 @@ class ScrollView(StencilView):
 
             # Mark that ScrollView hierarchy handling is complete
             touch.ud["sv_hierarchy_handled"] = True
-            
-            # BUGFIX: Proactively clear _touch for ALL ScrollViews in hierarchy
+
+            # Proactively clear _touch for ALL ScrollViews in hierarchy
             # This prevents stale touch references when intermediate ScrollViews
             # had _touch set but didn't call _scroll_finalize themselves
             for sv in hierarchy.scrollviews:
                 if sv._touch is touch:
-                    print(f'clearing stale _touch for {sv}')
                     sv._touch = None
 
             # CRITICAL: Check if a child widget (button) claimed this touch
