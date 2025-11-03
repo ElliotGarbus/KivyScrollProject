@@ -115,8 +115,13 @@ class PanelContainer(BoxLayout):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Bind to panel_index so we populate data after it's set
+        self.bind(panel_index=self._populate_inner_data)
+    
+    def _populate_inner_data(self, *args):
+        """Populate inner RecycleView after panel_index is set."""
         inner_rv = self.ids.get('inner_rv')
-        if inner_rv and not inner_rv.data:
+        if inner_rv:
             inner_rv.data = [
                 {'text': f'Panel {self.panel_index} - Item {i}'}
                 for i in range(50)
