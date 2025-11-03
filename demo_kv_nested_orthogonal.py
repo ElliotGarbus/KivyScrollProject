@@ -122,7 +122,8 @@ class HorizontalScrollRow(BoxLayout):
         label = Label(
             text=f'Row {self.row_index + 1} - Horizontal Scroll',
             size_hint_x=None,
-            width=200,
+            width='200dp',
+            height='30dp',
             color=[1, 1, 1, 1],
             bold=True
         )
@@ -133,7 +134,8 @@ class HorizontalScrollRow(BoxLayout):
             btn = Button(
                 text=f'Btn {j+1}',
                 size_hint_x=None,
-                width=100,
+                width='100dp',
+                height='80dp',
                 background_color=[0.2 + (self.row_index * 0.1) % 0.8, 0.3, 0.7, 1]
             )
             content.add_widget(btn)
@@ -151,7 +153,7 @@ class VerticalScrollColumn(BoxLayout):
         label = Label(
             text=f'Column {self.column_index + 1}\nVertical Scroll',
             size_hint_y=None,
-            height=40,
+            height='40dp',
             color=[1, 1, 1, 1],
             bold=True
         )
@@ -162,7 +164,7 @@ class VerticalScrollColumn(BoxLayout):
             btn = Button(
                 text=f'Item {j+1}',
                 size_hint_y=None,
-                height=60,
+                height='60dp',
                 background_color=[0.7, 0.3, 0.2 + (self.column_index * 0.1) % 0.8, 1]
             )
             content.add_widget(btn)

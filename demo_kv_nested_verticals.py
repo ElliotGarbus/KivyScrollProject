@@ -115,7 +115,7 @@ class InnerPanel(BoxLayout):
                 text=f"Inner Item {j} in Panel {self.panel_index + 1}",
                 size_hint_y=None,
                 size_hint_x=None,
-                height=32,
+                height='32dp',
                 color=(0.2, 0.6, 1, 1),  # Blue color to distinguish inner items
             )
             # Size label to fit text
