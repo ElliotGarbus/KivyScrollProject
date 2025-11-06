@@ -1,44 +1,48 @@
 """
-Simple ScrollView Demo - Single Label
-======================================
+Simple ScrollView Demo - Single Label (KV version)
+===================================================
 Demonstrates the most basic ScrollView usage: a Label with long text content
-that scrolls vertically.
+that scrolls vertically, using KV language.
 """
 
+# Register custom ScrollView with Factory BEFORE using it in KV
+from kivy.factory import Factory
+import scrollview
+
+Factory.unregister('ScrollView')
+Factory.register('ScrollView', cls=scrollview.ScrollView)
+
 from kivy.app import App
-from kivy.uix.label import Label
-from scrollview import ScrollView
+from kivy.lang import Builder
+
+# KV string defining the layout
+kv = '''
+ScrollView:
+    do_scroll_x: False
+    do_scroll_y: True
+    scroll_type: ['bars', 'content']
+    bar_width: dp(10)
+    bar_color: 0.3, 0.6, 1.0, 0.8
+    
+    Label:
+        id: content_label
+        size_hint_y: None
+        height: self.texture_size[1]
+        text_size: self.width, None
+        padding: dp(20), dp(20)
+        markup: True
+        halign: 'left'
+        valign: 'top'
+        color: 1, 1, 1, 1
+'''
 
 
 class SingleLabelDemo(App):
     def build(self):
-        # Create a ScrollView (vertical scrolling only)
-        scroll = ScrollView(
-            do_scroll_x=False,
-            do_scroll_y=True,
-            scroll_type=['bars', 'content'],
-            bar_width='10dp',
-            bar_color=[0.3, 0.6, 1.0, 0.8]
-        )
-        
-        # Create a Label with lots of text
-        label = Label(
-            text=self._get_sample_text(),
-            size_hint_y=None,  # Don't use size hint for height
-            padding=('20dp', '20dp'),
-            markup=True,
-            halign='left',
-            valign='top',
-            color=[1, 1, 1, 1]
-        )
-        
-        # Bind texture_size to height so label grows with content
-        label.bind(texture_size=label.setter('size'))
-        # Bind width to text_size so text wraps
-        label.bind(width=lambda *x: label.setter('text_size')(label, (label.width, None)))
-        
-        scroll.add_widget(label)
-        return scroll
+        root = Builder.load_string(kv)
+        # Set the label text after loading
+        root.ids.content_label.text = self._get_sample_text()
+        return root
     
     def _get_sample_text(self):
         """Generate sample text content."""
