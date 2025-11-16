@@ -117,10 +117,21 @@ class FlutterScrollEffect(ScrollEffect):
         return sign * result
 
     def _get_viewport_dimension(self):
-        '''Get the viewport dimension for rubber band calculation.'''
-        if self.target_widget:
-            return self.target_widget.height if abs(self.max - self.min) > 0 else 200
-        return 200  # fallback
+        '''Get the viewport dimension for rubber band calculation.
+        Detects whether this effect is used for X or Y scrolling by checking
+        which effect instance (effect_x or effect_y) this is in the parent ScrollView.
+        Returns the appropriate dimension: width for X, height for Y.
+        '''
+        target_widget = self.target_widget
+        sv = target_widget.parent
+        
+        if sv.effect_x is self:
+            # This is the X effect - use width for horizontal scrolling
+            return target_widget.width
+        elif sv.effect_y is self:
+            # This is the Y effect - use height for vertical scrolling
+            return self.target_widget.height
+        
 
     def update_velocity(self, dt):
         '''Update velocity with critically damped spring physics.'''
