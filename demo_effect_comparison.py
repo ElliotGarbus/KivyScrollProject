@@ -20,9 +20,7 @@ Instructions:
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.factory import Factory
-from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView as KivyScrollView
 from kivy.effects.dampedscroll import DampedScrollEffect
 from flutter_scroll_effect import FlutterScrollEffect
 
