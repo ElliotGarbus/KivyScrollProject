@@ -1,0 +1,154 @@
+Flutter-Inspired Scroll Effect for Kivy
+========================================
+
+This file clarifies the licensing for flutter_scroll_effect.py
+
+COPYRIGHT AND LICENSE
+---------------------
+
+The flutter_scroll_effect.py implementation is original work that may be
+distributed under the same terms as Kivy (MIT License).
+
+No source code was copied from Flutter, iOS, WebKit, or any other project.
+This is a clean-room implementation based on understanding publicly documented
+algorithms and standard physics principles.
+
+
+WHAT IS NOT COPYRIGHTABLE
+--------------------------
+
+This implementation uses the following, which are NOT subject to copyright:
+
+1. Mathematical Formulas:
+   - Critical damping: c = 2√(km)
+   - Spring force: F = -kx (Hooke's Law, 1660)
+   - Damping force: F = -cv
+   - Logarithmic function: (1.0 - (1.0 / ((x * coeff / dim) + 1.0))) * dim
+
+2. Physics Concepts:
+   - Mass-spring-damper systems (classical mechanics)
+   - Critical damping (control theory)
+   - Exponential decay
+   - Newton's laws of motion
+
+3. Algorithms:
+   - Semi-implicit Euler integration (numerical methods)
+   - Spring simulation (standard physics)
+
+
+ATTRIBUTION
+-----------
+
+This implementation was inspired by studying the behavior of:
+
+1. Flutter's BouncingScrollPhysics
+   - Project: https://github.com/flutter/flutter
+   - License: BSD 3-Clause License
+   - Copyright (c) Google Inc.
+   
+2. iOS UIScrollView
+   - Platform: Apple iOS/macOS
+   - Behavior documented in Apple's UIKit documentation
+   
+3. WebKit ScrollController
+   - Project: https://webkit.org
+   - License: BSD License / LGPL
+   - Copyright (c) Apple Inc. and WebKit contributors
+
+
+COMPATIBILITY WITH REFERENCED PROJECTS
+---------------------------------------
+
+Flutter (BSD 3-Clause):
+- Allows use, modification, and distribution
+- Requires attribution (provided above)
+- Disclaimer of warranties (below)
+
+WebKit (BSD/LGPL):
+- BSD portion allows free use of documented behavior
+- LGPL applies to specific code (not used here)
+
+iOS Documentation:
+- Public APIs and documented behavior may be implemented
+- No Apple source code was accessed or copied
+
+
+SUGGESTED LICENSE FOR YOUR PROJECT
+-----------------------------------
+
+Since this is compatible with Kivy's MIT License, you may use:
+
+MIT License (recommended for Kivy projects):
+
+Copyright (c) [Year] [Your Name]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+DISCLAIMER
+----------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. THE AUTHOR(S) DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE
+INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT
+SHALL THE AUTHOR(S) BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
+CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
+OF THIS SOFTWARE.
+
+
+PATENT CONSIDERATIONS
+---------------------
+
+To our knowledge, no patents apply to the mathematical formulas or physics
+concepts used in this implementation. Spring-damper systems and critical
+damping are well-established physics concepts from the 19th century.
+
+If you have concerns about patents related to specific UI interactions or
+behaviors, consult with a patent attorney.
+
+
+RECOMMENDATIONS FOR COMMERCIAL USE
+-----------------------------------
+
+If you plan to use this code commercially:
+
+1. ✅ You may use this code - it's compatible with commercial use
+2. ✅ Keep the attribution comments in the source file
+3. ✅ Include this license file in your distribution
+4. ✅ Comply with Kivy's MIT License terms
+5. ✅ Consider consulting a lawyer if you have specific concerns
+
+
+SUMMARY
+-------
+
+✅ Safe to use in open source projects
+✅ Safe to use in commercial projects
+✅ Safe to modify and extend
+✅ No code copied from other projects
+✅ Based on public domain physics and mathematics
+✅ Compatible with MIT License (Kivy)
+✅ Compatible with BSD 3-Clause License (Flutter)
+✅ Proper attribution provided
+
+Questions? The implementation uses well-documented, publicly available
+algorithms and physics that have been used in countless projects for decades.
+
