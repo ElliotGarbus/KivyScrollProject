@@ -21,7 +21,6 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.factory import Factory
 from kivy.uix.label import Label
-from kivy.effects.dampedscroll import DampedScrollEffect
 from flutter_scroll_effect import FlutterScrollEffect
 
 # KV language for the UI
@@ -135,8 +134,7 @@ class EffectComparisonDemo(App):
     def build(self):
         # Register the FlutterScrollEffect so KV can use it
         Factory.register('FlutterScrollEffect', cls=FlutterScrollEffect)
-        Factory.register('DampedScrollEffect', cls=DampedScrollEffect)
-        
+
         root = Builder.load_string(kv)
         
         # Populate both sides with identical content

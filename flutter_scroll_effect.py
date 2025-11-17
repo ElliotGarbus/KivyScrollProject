@@ -43,10 +43,9 @@ mathematical transformations that are in the public domain.
 
 __all__ = ('FlutterScrollEffect',)
 
-from math import sqrt, exp
+from math import sqrt
 from kivy.effects.scroll import ScrollEffect
 from kivy.properties import NumericProperty
-from kivy.metrics import dp
 
 
 class FlutterScrollEffect(ScrollEffect):
