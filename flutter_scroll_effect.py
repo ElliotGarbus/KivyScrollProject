@@ -61,10 +61,10 @@ class FlutterScrollEffect(ScrollEffect):
     '''
 
     rubber_band_coeff = NumericProperty(0.55)
-    '''Rubber band resistance coefficient. Higher values = more resistance.
+    '''Rubber band resistance coefficient. Higher values = less resistance.
     
-    Flutter/iOS typically use ~0.55. Lower values (0.3-0.4) feel more elastic,
-    higher values (0.6-0.8) feel stiffer.
+    Flutter/iOS typically use ~0.55. Lower values (0.3-0.4) feel stiffer,
+    higher values (0.6-0.8) feel more elastic.
     
     :attr:`rubber_band_coeff` is a :class:`~kivy.properties.NumericProperty` and
     defaults to 0.55.

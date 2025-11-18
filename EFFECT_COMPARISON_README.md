@@ -141,8 +141,8 @@ You can adjust the feel by changing these parameters in `flutter_scroll_effect.p
 
 ```python
 rubber_band_coeff = 0.55  # Resistance during drag
-                          # Lower (0.3-0.4) = more elastic
-                          # Higher (0.6-0.8) = stiffer
+                          # Lower (0.3-0.4) = stiffer (more resistance)
+                          # Higher (0.6-0.8) = more elastic (less resistance)
 
 spring_stiffness = 100.0  # Bounce-back speed
                           # Lower = slower return
