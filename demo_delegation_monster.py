@@ -19,96 +19,8 @@ from kivy.uix.button import Button
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.label import Label
 from kivy.metrics import dp
-from kivy.effects.dampedscroll import DampedScrollEffect
+from flutter_scroll_effect import FlutterScrollEffect
 from scrollview import ScrollView
-
-
-class FixedDampedScrollEffect(DampedScrollEffect):
-    """Fixed DampedScrollEffect that prevents dead zone and ensures boundary alignment.
-    
-    Fixes two issues with the original DampedScrollEffect:
-    
-    1. Dead zone during manual dragging: The original min_overscroll logic created
-       a dead zone where small overscroll values had no elastic resistance during
-       active dragging. This fix ensures snap-to-zero only applies during automatic
-       settling, not manual touch/drag.
-    
-    2. Boundary alignment: When overscroll snaps to zero, the scroll value is also
-       snapped to the exact boundary (min or max), ensuring content always settles
-       precisely at edges rather than with slight offsets.
-    
-    This allows min_overscroll to be increased (e.g., to 1.5) to prevent oscillation
-    without creating a noticeable dead zone during manual dragging.
-    """
-    
-    def update_velocity(self, dt):
-        if abs(self.velocity) <= self.min_velocity and self.overscroll == 0:
-            self.velocity = 0
-            if self.round_value:
-                self.value = round(self.value)
-            return
-
-        total_force = self.velocity * self.friction * dt / self.std_dt
-        
-        # FIX 1: Only snap overscroll to 0 during automatic settling, not manual dragging
-        # FIX 2: When snapping overscroll to 0, also snap value to exact boundary
-        if abs(self.overscroll) > self.min_overscroll:
-            total_force += self.velocity * self.edge_damping
-            total_force += self.overscroll * self.spring_constant
-        elif not self.is_manual:
-            # Snap overscroll to 0 when below threshold during automatic settling
-            if self.overscroll != 0:
-                # Also snap value to exact boundary to prevent offset settling
-                # Note: Need to normalize min/max since they can be reversed (Y-axis)
-                scroll_min = self.min
-                scroll_max = self.max
-                if scroll_min > scroll_max:
-                    scroll_min, scroll_max = scroll_max, scroll_min
-                
-                if self.overscroll < 0:
-                    # Below minimum boundary
-                    self.value = scroll_min
-                else:
-                    # Above maximum boundary
-                    self.value = scroll_max
-                self.overscroll = 0
-                self.velocity = 0
-                return
-
-        stop_overscroll = ''
-        if not self.is_manual:
-            if self.overscroll > 0 and self.velocity < 0:
-                stop_overscroll = 'max'
-            elif self.overscroll < 0 and self.velocity > 0:
-                stop_overscroll = 'min'
-
-        self.velocity = self.velocity - total_force
-        if not self.is_manual:
-            self.apply_distance(self.velocity * dt)
-            if stop_overscroll == 'min' and self.value > self.min:
-                self.value = self.min
-                self.velocity = 0
-                return
-            if stop_overscroll == 'max' and self.value < self.max:
-                self.value = self.max
-                self.velocity = 0
-                return
-        self.trigger_velocity_update()
-
-
-class ImprovedDampedScrollEffect(FixedDampedScrollEffect):
-    """DampedScrollEffect with fixes and increased min_overscroll to prevent oscillation.
-    
-    Increases min_overscroll from 0.5 to 1.5 to prevent infinite bar highlighting
-    caused by oscillation around the threshold on touchscreens.
-    
-    Inherits from FixedDampedScrollEffect to also get:
-    - No dead zone during manual dragging
-    - Exact boundary alignment after settling
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.min_overscroll = 1.5
 
 
 class DelegationMonsterDemo(App):
@@ -121,7 +33,7 @@ class DelegationMonsterDemo(App):
     
     def build(self):
         # Set improved effect class for all ScrollViews in this demo
-        ScrollView.effect_cls = ImprovedDampedScrollEffect
+        ScrollView.effect_cls = FlutterScrollEffect
         # Root container
         root = BoxLayout(orientation='vertical')
         
